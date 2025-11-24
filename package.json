@@ -1,0 +1,39 @@
+{
+  "name": "mouth-track",
+  "version": "0.1.0",
+  "description": "リアルタイム口の動きトラッキングモジュール",
+  "type": "module",
+  "main": "js/index.js",
+  "exports": {
+    ".": "./js/index.js",
+    "./core": "./js/core/index.js",
+    "./utils": "./js/utils/index.js"
+  },
+  "scripts": {
+    "start": "npx http-server . -p 8080 -o",
+    "dev": "npx http-server . -p 8080 -o -c-1",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "face-tracking",
+    "mediapipe",
+    "mouth-tracking",
+    "web-module"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1640029074",
+    "@mediapipe/control_utils": "^0.6.1629159504",
+    "@mediapipe/drawing_utils": "^0.3.1620248257",
+    "@mediapipe/face_mesh": "^0.4.1633559619"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  }
+}
+
