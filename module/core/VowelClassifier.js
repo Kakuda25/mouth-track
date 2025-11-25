@@ -13,29 +13,34 @@ export class VowelClassifier {
             // 各母音の特徴量範囲
             vowels: {
                 'あ': {
-                    openness: { min: 0.6, max: 1.0 },
-                    width: { min: 0.5, max: 0.8 },
-                    aspectRatio: { min: 0.5, max: 0.8 }
+                    // 大きく開く、縦長
+                    openness: { min: 0.65, max: 1.0 },
+                    width: { min: 0.5, max: 0.75 },
+                    aspectRatio: { min: 0.5, max: 0.75 }
                 },
                 'い': {
-                    openness: { min: 0.0, max: 0.3 },
-                    width: { min: 0.7, max: 1.0 },
-                    aspectRatio: { min: 1.5, max: 3.0 }
+                    // 横に広げる、開きは小さい
+                    openness: { min: 0.0, max: 0.25 },
+                    width: { min: 0.75, max: 1.0 },
+                    aspectRatio: { min: 2.0, max: 4.0 }
                 },
                 'う': {
-                    openness: { min: 0.0, max: 0.2 },
-                    width: { min: 0.3, max: 0.5 },
-                    aspectRatio: { min: 1.0, max: 2.0 }
+                    // すぼめる、小さい
+                    openness: { min: 0.0, max: 0.15 },
+                    width: { min: 0.3, max: 0.45 },
+                    aspectRatio: { min: 1.5, max: 2.5 }
                 },
                 'え': {
-                    openness: { min: 0.3, max: 0.5 },
-                    width: { min: 0.6, max: 0.9 },
-                    aspectRatio: { min: 1.2, max: 2.0 }
+                    // 少し開いて横に広げる
+                    openness: { min: 0.3, max: 0.45 },
+                    width: { min: 0.65, max: 0.85 },
+                    aspectRatio: { min: 1.3, max: 2.2 }
                 },
                 'お': {
-                    openness: { min: 0.4, max: 0.6 },
+                    // 丸く開ける、中程度
+                    openness: { min: 0.5, max: 0.65 },
                     width: { min: 0.5, max: 0.7 },
-                    aspectRatio: { min: 0.9, max: 1.3 }
+                    aspectRatio: { min: 0.8, max: 1.2 }
                 }
             }
         };
