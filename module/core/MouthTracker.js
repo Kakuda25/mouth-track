@@ -51,6 +51,7 @@ export class MouthTracker {
     processResults(results) {
         const mouthLandmarks = this.faceMeshHandler.getMouthLandmarks(results);
         const allMouthLandmarks = this.faceMeshHandler.getAllMouthLandmarks(results);
+        const contourLandmarks = this.faceMeshHandler.getMouthContourLandmarks(results);
         const confidence = this.faceMeshHandler.getConfidence(results);
 
         if (!mouthLandmarks) {
@@ -80,8 +81,8 @@ export class MouthTracker {
             smoothedLandmarks[key] = this.smoother.smooth(key, mouthLandmarks[key]);
         });
 
-        // 計測値を計算
-        const metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks);
+        // 計測値を計算（MOUTH_CONTOUR_INDICESを使用してより正確に）
+        const metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks);
 
         // 変化率を計算
         if (this.lastMetrics) {

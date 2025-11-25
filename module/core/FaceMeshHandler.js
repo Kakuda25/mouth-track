@@ -3,7 +3,7 @@
  * FaceMeshの初期化と結果の処理を行います
  */
 
-import { FACE_MESH_CONFIG } from '../config/constants.js';
+import { FACE_MESH_CONFIG, MOUTH_CONTOUR_INDICES } from '../config/constants.js';
 import { structureMouthLandmarks } from '../utils/MouthLandmarks.js';
 
 // MediaPipe FaceMeshの動的インポート
@@ -145,6 +145,41 @@ export class FaceMeshHandler {
             .filter(item => item !== null);
 
         return mouthLandmarks.length > 0 ? mouthLandmarks : null;
+    }
+
+    /**
+     * 口の輪郭ランドマークを取得（MOUTH_CONTOUR_INDICESを使用）
+     * より多くの点を使用することで、より正確な計測が可能
+     * @param {Object} results - FaceMeshの結果
+     * @returns {Array|null} 口の輪郭ランドマーク配列
+     */
+    getMouthContourLandmarks(results) {
+        if (!results || !results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+            return null;
+        }
+
+        const landmarks = results.multiFaceLandmarks[0];
+
+        // 重複を削除
+        const uniqueIndices = [...new Set(MOUTH_CONTOUR_INDICES)];
+
+        // ランドマークを取得（存在するもののみ）
+        const contourLandmarks = uniqueIndices
+            .map(index => {
+                if (landmarks[index]) {
+                    return {
+                        index: index,
+                        point: landmarks[index],
+                        x: landmarks[index].x,
+                        y: landmarks[index].y,
+                        z: landmarks[index].z || 0
+                    };
+                }
+                return null;
+            })
+            .filter(item => item !== null);
+
+        return contourLandmarks.length > 0 ? contourLandmarks : null;
     }
 
     /**

@@ -6,6 +6,7 @@
 import { CameraManager } from '../module/core/CameraManager.js';
 import { ErrorHandler } from '../module/utils/ErrorHandler.js';
 import { MouthTracker } from '../module/core/MouthTracker.js';
+import { VowelClassifier } from '../module/core/VowelClassifier.js';
 import { Visualizer } from '../module/ui/Visualizer.js';
 
 // アプリケーション初期化
@@ -31,6 +32,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const confidenceValue = document.getElementById('confidenceValue');
     const opennessValue = document.getElementById('opennessValue');
     const widthValue = document.getElementById('widthValue');
+    const vowelValue = document.getElementById('vowelValue');
+    const vowelConfidenceValue = document.getElementById('vowelConfidenceValue');
+
+    // 母音判別器の初期化
+    let vowelClassifier = null;
 
     if (!videoElement || !cameraSelect || !startBtn || !stopBtn) {
         console.error('必要なDOM要素が見つかりません', {
@@ -141,11 +147,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                 visualizer.resize();
             }
 
+            // 母音判別器の初期化
+            vowelClassifier = new VowelClassifier({
+                onVowelDetected: (result) => {
+                    // 母音判別結果を表示
+                    if (vowelValue) {
+                        vowelValue.textContent = result.vowel || '-';
+                        vowelValue.style.color = result.vowel ? '#4CAF50' : '#999';
+                    }
+                    if (vowelConfidenceValue) {
+                        vowelConfidenceValue.textContent = result.vowel ? 
+                            (result.confidence * 100).toFixed(1) + '%' : '-';
+                    }
+                }
+            });
+
             // MouthTrackerの初期化と開始
             try {
                 mouthTracker = new MouthTracker(videoElement, (data) => {
                     // データ更新時のコールバック
                     updateDataDisplay(data);
+
+                    // 母音判別を実行
+                    if (data.metrics && vowelClassifier) {
+                        vowelClassifier.classify(data.metrics);
+                    }
 
                     // ランドマークを描画（全ランドマークも含む）
                     if (visualizer) {
@@ -159,6 +185,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                             overlayInfo.classList.remove('error');
                             overlayInfo.style.display = 'block';
                             visualizer.clear();
+                            
+                            // 母音表示をリセット
+                            if (vowelValue) {
+                                vowelValue.textContent = '-';
+                                vowelValue.style.color = '#999';
+                            }
+                            if (vowelConfidenceValue) vowelConfidenceValue.textContent = '-';
                         }
                     }
                 });
@@ -246,6 +279,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (confidenceValue) confidenceValue.textContent = '-';
         if (opennessValue) opennessValue.textContent = '-';
         if (widthValue) widthValue.textContent = '-';
+        if (vowelValue) vowelValue.textContent = '-';
+        if (vowelConfidenceValue) vowelConfidenceValue.textContent = '-';
     }
 
     // ミラーモードの切り替え

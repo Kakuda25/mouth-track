@@ -32,6 +32,7 @@ export const MOUTH_ALL_LANDMARKS = [
 ].filter((v, i, a) => a.indexOf(v) === i); // 重複を削除
 
 // より正確な口周辺のランドマーク（MediaPipe FaceMeshの標準的な口の輪郭）
+// 重複を削除して使用
 export const MOUTH_CONTOUR_INDICES = [
     // 上唇外側
     12, 13, 14, 15, 16, 17, 18,
@@ -39,11 +40,9 @@ export const MOUTH_CONTOUR_INDICES = [
     78, 79, 80, 81, 82,
     // 下唇内側
     308, 309, 310, 311, 312,
-    // 下唇外側
-    14, 15, 16, 17, 18,
     // 口角
     61, 291
-];
+].filter((v, i, a) => a.indexOf(v) === i); // 重複を削除
 
 // MediaPipe FaceMesh設定
 export const FACE_MESH_CONFIG = {
