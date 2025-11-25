@@ -8,14 +8,14 @@
  */
 export class VowelClassifier {
     constructor(options = {}) {
-        // デフォルトの閾値設定（相対的な判定用、正規化なし）
+        // デフォルトの閾値設定
         // 実際の計測値の範囲（0.01-0.1程度）に合わせて調整
         this.thresholds = {
             // 各母音の特徴量範囲（生の計測値）
             vowels: {
                 'あ': {
                     // 大きく開く、縦長
-                    openness: { min: 0.06, max: 0.15 },  // 実際の範囲に合わせて調整
+                    openness: { min: 0.06, max: 0.15 },  
                     width: { min: 0.05, max: 0.12 },
                     aspectRatio: { min: 0.5, max: 0.8 }
                 },
@@ -46,7 +46,6 @@ export class VowelClassifier {
             }
         };
 
-        // 相対的な判定を使用（キャリブレーション不要）
         // コールバック関数
         this.onVowelDetected = options.onVowelDetected || null;
 
