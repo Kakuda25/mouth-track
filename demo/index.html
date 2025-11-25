@@ -4,117 +4,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="リアルタイム口の動きトラッキングWEBアプリケーション">
+    <meta name="description" content="リアルタイム口の動きトラッキングと母音判別WEBアプリケーション">
+    <meta name="theme-color" content="#4a90e2">
     <title>口の動きトラッキング - Mouth Track</title>
 
     <!-- CSS -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/vowel-panel.css">
     <link rel="stylesheet" href="css/responsive.css">
 </head>
 
 <body>
     <div class="app-container">
-        <!-- ヘッダー -->
-        <header class="app-header">
+        <header class="app-header" role="banner">
             <h1>口の動きトラッキング</h1>
-            <p class="subtitle">リアルタイムで口の動きを追跡します</p>
+            <p class="subtitle">リアルタイムで口の動きを追跡し、母音を判別します</p>
         </header>
 
-        <!-- メインコンテンツ -->
-        <main class="main-content">
+        <main class="main-content" role="main">
             <!-- カメラプレビュー領域 -->
-            <section class="preview-section">
+            <section class="preview-section" aria-label="カメラプレビュー">
                 <div class="video-container">
-                    <video id="videoElement" autoplay playsinline></video>
-                    <canvas id="canvasElement"></canvas>
-                    <div class="overlay-info" id="overlayInfo">
+                    <video 
+                        id="videoElement" 
+                        autoplay 
+                        playsinline 
+                        aria-label="カメラ映像"
+                        muted>
+                    </video>
+                    <canvas 
+                        id="canvasElement" 
+                        aria-label="トラッキング結果表示"
+                        role="img">
+                    </canvas>
+                    <div class="overlay-info" id="overlayInfo" role="status" aria-live="polite">
                         <p>カメラを起動してください</p>
                     </div>
                 </div>
             </section>
 
             <!-- コントロールパネル -->
-            <section class="control-panel">
+            <section class="control-panel" aria-label="コントロール">
                 <div class="control-group">
-                    <button id="startBtn" class="btn btn-primary">トラッキング開始</button>
-                    <button id="stopBtn" class="btn btn-secondary" disabled>トラッキング停止</button>
+                    <button 
+                        id="startBtn" 
+                        class="btn btn-primary"
+                        aria-label="トラッキングを開始">
+                        トラッキング開始
+                    </button>
+                    <button 
+                        id="stopBtn" 
+                        class="btn btn-secondary" 
+                        disabled
+                        aria-label="トラッキングを停止">
+                        トラッキング停止
+                    </button>
                 </div>
 
                 <div class="control-group">
                     <label for="cameraSelect">カメラ選択:</label>
-                    <select id="cameraSelect" class="select-input">
+                    <select 
+                        id="cameraSelect" 
+                        class="select-input"
+                        aria-label="使用するカメラを選択">
                         <option value="">カメラを検索中...</option>
                     </select>
                 </div>
+            </section>
 
-                <div class="control-group">
-                    <label>
-                        <input type="checkbox" id="mirrorMode" checked>
-                        ミラーモード
-                    </label>
+            <!-- 母音判別パネル（メイン） -->
+            <section class="vowel-panel" aria-label="母音判別結果">
+                <h2>母音判別</h2>
+                <div class="vowel-display">
+                    <div class="vowel-main">
+                        <div class="vowel-label">検出された母音</div>
+                        <div 
+                            class="vowel-value" 
+                            id="vowelValue" 
+                            role="status" 
+                            aria-live="polite"
+                            aria-label="検出された母音">
+                            -
+                        </div>
+                        <div 
+                            class="vowel-confidence" 
+                            id="vowelConfidenceValue"
+                            aria-label="判別の信頼度">
+                            -
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <!-- データ表示パネル -->
-            <section class="data-panel">
+            <!-- データ表示パネル（詳細情報） -->
+            <section class="data-panel" aria-label="トラッキングデータ">
                 <h2>トラッキングデータ</h2>
-                <div class="data-display" id="dataDisplay">
+                <div class="data-display" id="dataDisplay" role="region">
                     <div class="data-item">
                         <span class="data-label">FPS:</span>
-                        <span class="data-value" id="fpsValue">-</span>
+                        <span class="data-value" id="fpsValue" aria-label="フレームレート">-</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">信頼度:</span>
-                        <span class="data-value" id="confidenceValue">-</span>
+                        <span class="data-value" id="confidenceValue" aria-label="検出信頼度">-</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">口の開き:</span>
-                        <span class="data-value" id="opennessValue">-</span>
+                        <span class="data-value" id="opennessValue" aria-label="口の開き具合">-</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">口の幅:</span>
-                        <span class="data-value" id="widthValue">-</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">検出された母音:</span>
-                        <span class="data-value" id="vowelValue" style="font-size: 2em; font-weight: bold;">-</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">信頼度:</span>
-                        <span class="data-value" id="vowelConfidenceValue">-</span>
+                        <span class="data-value" id="widthValue" aria-label="口の幅">-</span>
                     </div>
                 </div>
             </section>
-
-            <!-- 設定パネル -->
-            <section class="settings-panel" id="settingsPanel">
-                <h2>設定</h2>
-                <div class="settings-content">
-                    <div class="setting-item">
-                        <label for="smoothingFactor">平滑化係数:</label>
-                        <input type="range" id="smoothingFactor" min="0" max="1" step="0.1" value="0.5">
-                        <span id="smoothingValue">0.5</span>
-                    </div>
-                    <div class="setting-item">
-                        <label>
-                            <input type="checkbox" id="showLandmarks" checked>
-                            ランドマーク表示
-                        </label>
-                    </div>
-                    <div class="setting-item">
-                        <label>
-                            <input type="checkbox" id="showCoordinates">
-                            座標値表示
-                        </label>
-                    </div>
-                </div>
-            </section>
-
         </main>
 
-        <!-- フッター -->
-        <footer class="app-footer">
+        <footer class="app-footer" role="contentinfo">
             <p>MediaPipe FaceMeshを使用しています</p>
         </footer>
     </div>

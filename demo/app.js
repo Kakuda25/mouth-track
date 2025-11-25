@@ -157,18 +157,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (vowelValue) {
                         if (result.isCalibrating) {
                             vowelValue.textContent = `キャリブレーション中... ${(result.calibrationProgress * 100).toFixed(0)}%`;
-                            vowelValue.style.color = '#ffa500';
+                            vowelValue.className = 'vowel-value calibrating';
                         } else {
                             vowelValue.textContent = result.vowel || '-';
-                            vowelValue.style.color = result.vowel ? '#4CAF50' : '#999';
+                            vowelValue.className = result.vowel ? 'vowel-value detected' : 'vowel-value';
                         }
                     }
                     if (vowelConfidenceValue) {
                         if (result.isCalibrating) {
                             vowelConfidenceValue.textContent = '-';
+                            vowelConfidenceValue.className = 'vowel-confidence';
                         } else {
                             vowelConfidenceValue.textContent = result.vowel ? 
-                                (result.confidence * 100).toFixed(1) + '%' : '-';
+                                `信頼度: ${(result.confidence * 100).toFixed(1)}%` : '-';
+                            vowelConfidenceValue.className = result.vowel ? 'vowel-confidence active' : 'vowel-confidence';
                         }
                     }
                 },
@@ -176,9 +178,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log('キャリブレーション完了:', baseline);
                     if (vowelValue) {
                         vowelValue.textContent = 'キャリブレーション完了';
-                        vowelValue.style.color = '#4CAF50';
+                        vowelValue.className = 'vowel-value detected';
                         setTimeout(() => {
-                            if (vowelValue) vowelValue.textContent = '-';
+                            if (vowelValue) {
+                                vowelValue.textContent = '-';
+                                vowelValue.className = 'vowel-value';
+                            }
                         }, 2000);
                     }
                 }
@@ -237,9 +242,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                             // 母音表示をリセット
                             if (vowelValue) {
                                 vowelValue.textContent = '-';
-                                vowelValue.style.color = '#999';
+                                vowelValue.className = 'vowel-value';
                             }
-                            if (vowelConfidenceValue) vowelConfidenceValue.textContent = '-';
+                            if (vowelConfidenceValue) {
+                                vowelConfidenceValue.textContent = '-';
+                                vowelConfidenceValue.className = 'vowel-confidence';
+                            }
                         }
                     }
                 });
@@ -327,50 +335,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (confidenceValue) confidenceValue.textContent = '-';
         if (opennessValue) opennessValue.textContent = '-';
         if (widthValue) widthValue.textContent = '-';
-        if (vowelValue) vowelValue.textContent = '-';
-        if (vowelConfidenceValue) vowelConfidenceValue.textContent = '-';
-    }
-
-    // ミラーモードの切り替え
-    const mirrorModeCheckbox = document.getElementById('mirrorMode');
-    if (mirrorModeCheckbox) {
-        mirrorModeCheckbox.addEventListener('change', (e) => {
-            if (videoElement) {
-                videoElement.style.transform = e.target.checked ? 'scaleX(-1)' : 'scaleX(1)';
-            }
-        });
-
-        // 初期状態を適用
-        if (mirrorModeCheckbox.checked) {
-            videoElement.style.transform = 'scaleX(-1)';
+        if (vowelValue) {
+            vowelValue.textContent = '-';
+            vowelValue.className = 'vowel-value';
+        }
+        if (vowelConfidenceValue) {
+            vowelConfidenceValue.textContent = '-';
+            vowelConfidenceValue.className = 'vowel-confidence';
         }
     }
 
-    // 設定パネルのイベント
-    const showLandmarksCheckbox = document.getElementById('showLandmarks');
-    if (showLandmarksCheckbox && visualizer) {
-        showLandmarksCheckbox.addEventListener('change', (e) => {
-            visualizer.updateSettings({ showLandmarks: e.target.checked });
-        });
-    }
-
-    const showCoordinatesCheckbox = document.getElementById('showCoordinates');
-    if (showCoordinatesCheckbox && visualizer) {
-        showCoordinatesCheckbox.addEventListener('change', (e) => {
-            visualizer.updateSettings({ showCoordinates: e.target.checked });
-        });
-    }
-
-    const smoothingFactorSlider = document.getElementById('smoothingFactor');
-    const smoothingValue = document.getElementById('smoothingValue');
-    if (smoothingFactorSlider && smoothingValue) {
-        smoothingFactorSlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            smoothingValue.textContent = value.toFixed(1);
-            if (mouthTracker) {
-                mouthTracker.setSmoothingFactor(value);
-            }
-        });
-    }
+    // ミラーモードは削除（不要なため）
 });
 

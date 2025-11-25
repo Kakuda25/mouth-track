@@ -1,0 +1,120 @@
+/* 母音判別パネル（メイン） */
+.vowel-panel {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    padding: var(--spacing-xl);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+    color: var(--text-light);
+    order: -1; /* 最初に表示 */
+}
+
+.vowel-panel h2 {
+    font-size: 1.5rem;
+    margin-bottom: var(--spacing-lg);
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+.vowel-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+.vowel-main {
+    width: 100%;
+    max-width: 400px;
+}
+
+.vowel-label {
+    font-size: 1rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.9;
+    font-weight: 500;
+}
+
+.vowel-value {
+    font-size: 6rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: var(--spacing-md);
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-normal);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.vowel-value.detected {
+    color: #4CAF50;
+    transform: scale(1.1);
+    animation: pulse 0.5s ease-in-out;
+}
+
+.vowel-value.calibrating {
+    color: #ffa500;
+    font-size: 2rem;
+}
+
+.vowel-confidence {
+    font-size: 1.25rem;
+    opacity: 0.8;
+    font-weight: 500;
+    transition: opacity var(--transition-normal);
+}
+
+.vowel-confidence.active {
+    opacity: 1;
+    color: #4CAF50;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1.1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+/* データ表示パネル（詳細情報）の調整 */
+.data-panel {
+    order: 1; /* 母音判別の後に表示 */
+}
+
+.data-panel h2 {
+    font-size: 1.25rem;
+    margin-bottom: var(--spacing-md);
+    color: var(--text-primary);
+}
+
+.data-display {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.data-item {
+    padding: var(--spacing-sm);
+    background-color: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    border-left: 3px solid var(--primary-color);
+}
+
+.data-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.data-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+

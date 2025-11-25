@@ -119,16 +119,6 @@ mouth-track/
 │   ├── css/                  # デモ用CSS
 │   └── README.md             # デモの使い方
 │
-├── examples/                  # 使用例
-│   ├── react/                # React使用例（今後追加予定）
-│   ├── vue/                  # Vue.js使用例（今後追加予定）
-│   └── vanilla/              # Vanilla JS使用例（今後追加予定）
-│
-├── docs/                      # ドキュメント
-│   └── README.md             # ドキュメント一覧
-│
-├── tests/                     # テストコード（今後追加予定）
-│
 ├── package.json              # npm設定
 ├── README.md                 # 本ファイル
 ├── REQUIREMENTS.md           # 要件定義書

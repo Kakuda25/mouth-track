@@ -94,6 +94,33 @@ body {
     gap: var(--spacing-lg);
 }
 
+/* レイアウト調整: 母音判別とデータ表示を横並び（大画面） */
+@media (min-width: 1024px) {
+    .main-content {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas: 
+            "preview preview"
+            "control control"
+            "vowel data";
+    }
+    
+    .preview-section {
+        grid-area: preview;
+    }
+    
+    .control-panel {
+        grid-area: control;
+    }
+    
+    .vowel-panel {
+        grid-area: vowel;
+    }
+    
+    .data-panel {
+        grid-area: data;
+    }
+}
+
 /* フッター */
 .app-footer {
     text-align: center;
