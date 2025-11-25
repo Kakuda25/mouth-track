@@ -44,12 +44,14 @@ tracker.onDataUpdate = (data) => {
 ## 機能
 
 ### コア機能
-- **リアルタイム口トラッキング**: 6点の口ランドマークを30fps以上でトラッキング
-  - 左端・右端（2点）
-  - 上唇中央外側・下唇中央外側（2点）
-  - 上唇中央内側・下唇中央内側（2点）
-- **データ計測**: 口の開き具合、幅、面積、アスペクト比などの計測値の算出
-- **母音判別**: 日本語の5つの母音（あ、い、う、え、お）を判別
+- **リアルタイム口トラッキング**: 16点の口輪郭ランドマークを30fps以上でトラッキング
+  - 上唇外側（7点）
+  - 上唇内側（5点）
+  - 下唇内側（5点）
+  - 口角（2点）
+- **高精度データ計測**: `MOUTH_CONTOUR_INDICES`を使用した詳細な口の形状計測
+  - 口の開き具合、幅、面積、アスペクト比などの計測値の算出
+- **母音判別**: 日本語の5つの母音（あ、い、う、え、お）を相対判定方式で判別
 - **カメラ選択**: 複数カメラがある場合の選択機能
 - **可視化**: トラッキングポイントの視覚的表示（オプション）
 
@@ -121,8 +123,7 @@ mouth-track/
 │
 ├── package.json              # npm設定
 ├── README.md                 # 本ファイル
-├── REQUIREMENTS.md           # 要件定義書
-└── DEVELOPMENT_PLAN.md       # 開発計画
+└── REQUIREMENTS.md           # 要件定義書
 ```
 
 ## 使用方法
@@ -149,7 +150,7 @@ import { MouthTracker, VowelClassifier } from './module/index.js';
 
 ## 母音判別機能
 
-`VowelClassifier`クラスを使用して、口の形状から母音を判別できます。
+`VowelClassifier`クラスを使用して、口の形状から母音を判別できます。**相対判定方式**を採用しており、ユーザーごとの個体差に対応しています。
 
 ```javascript
 const classifier = new VowelClassifier({
@@ -157,12 +158,19 @@ const classifier = new VowelClassifier({
         console.log('判別結果:', result.vowel); // 'あ', 'い', 'う', 'え', 'お', または null
         console.log('信頼度:', result.confidence); // 0.0 〜 1.0
         console.log('確率分布:', result.probabilities); // 各母音の確率
+        console.log('スコア:', result.scores); // 各母音のスコア
     }
 });
 
-// 計測値から母音を判別
+// 計測値から母音を判別（生の計測値をそのまま使用）
 const result = classifier.classify(metrics);
 ```
+
+### 判別方式
+
+- **相対判定**: 生の計測値を正規化せずに、相対的な特徴量で判定
+- **高精度計測**: `MOUTH_CONTOUR_INDICES`（16点）を使用した詳細な口の輪郭分析
+- **閾値ベース分類**: 各母音の特徴量範囲に基づいたスコアリング
 
 詳細は [REQUIREMENTS.md](./REQUIREMENTS.md) を参照してください。
 
@@ -173,10 +181,6 @@ const result = classifier.classify(metrics);
 - ✅ Safari (macOS/iOS)
 
 **注意**: カメラアクセスにはHTTPS環境またはlocalhostが必要です。
-
-## 開発計画
-
-詳細な開発計画は [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) を参照してください。
 
 ## 要件定義
 
