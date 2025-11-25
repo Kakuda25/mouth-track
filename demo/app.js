@@ -149,50 +149,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // 母音判別器の初期化
             vowelClassifier = new VowelClassifier({
-                autoCalibrate: true, // 自動キャリブレーション有効
-                calibrationFrames: 90, // 3秒間（30fps × 3秒）
-                calibrationMargin: 1.2, // 20%のマージン
                 onVowelDetected: (result) => {
                     // 母音判別結果を表示
                     if (vowelValue) {
-                        if (result.isCalibrating) {
-                            vowelValue.textContent = `キャリブレーション中... ${(result.calibrationProgress * 100).toFixed(0)}%`;
-                            vowelValue.className = 'vowel-value calibrating';
-                        } else {
-                            vowelValue.textContent = result.vowel || '-';
-                            vowelValue.className = result.vowel ? 'vowel-value detected' : 'vowel-value';
-                        }
+                        vowelValue.textContent = result.vowel || '-';
+                        vowelValue.className = result.vowel ? 'vowel-value detected' : 'vowel-value';
                     }
                     if (vowelConfidenceValue) {
-                        if (result.isCalibrating) {
-                            vowelConfidenceValue.textContent = '-';
-                            vowelConfidenceValue.className = 'vowel-confidence';
-                        } else {
-                            vowelConfidenceValue.textContent = result.vowel ? 
-                                `信頼度: ${(result.confidence * 100).toFixed(1)}%` : '-';
-                            vowelConfidenceValue.className = result.vowel ? 'vowel-confidence active' : 'vowel-confidence';
-                        }
-                    }
-                },
-                onCalibrationComplete: (baseline) => {
-                    console.log('キャリブレーション完了:', baseline);
-                    if (vowelValue) {
-                        vowelValue.textContent = 'キャリブレーション完了';
-                        vowelValue.className = 'vowel-value detected';
-                        setTimeout(() => {
-                            if (vowelValue) {
-                                vowelValue.textContent = '-';
-                                vowelValue.className = 'vowel-value';
-                            }
-                        }, 2000);
+                        vowelConfidenceValue.textContent = result.vowel ? 
+                            `信頼度: ${(result.confidence * 100).toFixed(1)}%` : '-';
+                        vowelConfidenceValue.className = result.vowel ? 'vowel-confidence active' : 'vowel-confidence';
                     }
                 }
             });
-            
-            // デバッグモードを有効化（開発時のみ）
-            if (vowelClassifier.setDebugMode) {
-                vowelClassifier.setDebugMode(true);
-            }
 
             // MouthTrackerの初期化と開始
             try {
@@ -208,17 +177,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (result.metrics && (!window._debugFrameCount || window._debugFrameCount < 10)) {
                             window._debugFrameCount = (window._debugFrameCount || 0) + 1;
                             console.log(`[Frame ${window._debugFrameCount}] 計測値:`, {
-                                raw: {
+                                metrics: {
                                     openness: data.metrics.openness?.toFixed(4),
                                     width: data.metrics.width?.toFixed(4),
                                     aspectRatio: data.metrics.aspectRatio?.toFixed(2)
                                 },
-                                normalized: result.metrics ? {
-                                    openness: result.metrics.openness?.toFixed(4),
-                                    width: result.metrics.width?.toFixed(4),
-                                    aspectRatio: result.metrics.aspectRatio?.toFixed(2)
-                                } : null,
-                                baseline: vowelClassifier.userBaseline,
                                 scores: result.scores,
                                 vowel: result.vowel,
                                 confidence: result.confidence?.toFixed(2)

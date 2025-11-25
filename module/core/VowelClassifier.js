@@ -8,69 +8,51 @@
  */
 export class VowelClassifier {
     constructor(options = {}) {
-        // デフォルトの閾値設定
+        // デフォルトの閾値設定（相対的な判定用、正規化なし）
+        // 実際の計測値の範囲（0.01-0.1程度）に合わせて調整
         this.thresholds = {
-            // 各母音の特徴量範囲
+            // 各母音の特徴量範囲（生の計測値）
             vowels: {
                 'あ': {
                     // 大きく開く、縦長
-                    openness: { min: 0.65, max: 1.0 },
-                    width: { min: 0.5, max: 0.75 },
-                    aspectRatio: { min: 0.5, max: 0.75 }
+                    openness: { min: 0.06, max: 0.15 },  // 実際の範囲に合わせて調整
+                    width: { min: 0.05, max: 0.12 },
+                    aspectRatio: { min: 0.5, max: 0.8 }
                 },
                 'い': {
                     // 横に広げる、開きは小さい
-                    openness: { min: 0.0, max: 0.25 },
-                    width: { min: 0.75, max: 1.0 },
-                    aspectRatio: { min: 2.0, max: 4.0 }
+                    openness: { min: 0.0, max: 0.03 },
+                    width: { min: 0.08, max: 0.15 },
+                    aspectRatio: { min: 2.0, max: 5.0 }
                 },
                 'う': {
                     // すぼめる、小さい
-                    openness: { min: 0.0, max: 0.15 },
-                    width: { min: 0.3, max: 0.45 },
-                    aspectRatio: { min: 1.5, max: 2.5 }
+                    openness: { min: 0.0, max: 0.02 },
+                    width: { min: 0.03, max: 0.06 },
+                    aspectRatio: { min: 1.5, max: 3.0 }
                 },
                 'え': {
                     // 少し開いて横に広げる
-                    openness: { min: 0.3, max: 0.45 },
-                    width: { min: 0.65, max: 0.85 },
-                    aspectRatio: { min: 1.3, max: 2.2 }
+                    openness: { min: 0.03, max: 0.05 },
+                    width: { min: 0.07, max: 0.12 },
+                    aspectRatio: { min: 1.5, max: 2.5 }
                 },
                 'お': {
                     // 丸く開ける、中程度
-                    openness: { min: 0.5, max: 0.65 },
-                    width: { min: 0.5, max: 0.7 },
-                    aspectRatio: { min: 0.8, max: 1.2 }
+                    openness: { min: 0.05, max: 0.08 },
+                    width: { min: 0.05, max: 0.10 },
+                    aspectRatio: { min: 0.9, max: 1.5 }
                 }
             }
         };
 
-        // ユーザー基準値（キャリブレーション用）
-        // 初期値は0に設定（動的に更新される）
-        this.userBaseline = {
-            maxOpenness: 0,
-            maxWidth: 0
-        };
-
-        // キャリブレーション設定
-        this.calibrationFrames = 0;
-        this.calibrationMaxFrames = options.calibrationFrames || 90; // デフォルト3秒（30fps × 3秒）
-        this.isCalibrating = options.autoCalibrate !== false; // デフォルトで自動キャリブレーション有効
-        this.calibrationMargin = options.calibrationMargin || 1.2; // 20%のマージン
-
+        // 相対的な判定を使用（キャリブレーション不要）
         // コールバック関数
         this.onVowelDetected = options.onVowelDetected || null;
-        this.onCalibrationComplete = options.onCalibrationComplete || null;
 
         // カスタム閾値の適用
         if (options.thresholds) {
             this.thresholds = { ...this.thresholds, ...options.thresholds };
-        }
-
-        // ユーザー基準値の適用（手動設定の場合）
-        if (options.userBaseline) {
-            this.userBaseline = { ...this.userBaseline, ...options.userBaseline };
-            this.isCalibrating = false; // 手動設定の場合はキャリブレーションをスキップ
         }
     }
 
@@ -89,71 +71,14 @@ export class VowelClassifier {
             };
         }
 
-        // キャリブレーション中は最大値を記録
-        if (this.isCalibrating) {
-            this.userBaseline.maxOpenness = Math.max(
-                this.userBaseline.maxOpenness, 
-                metrics.openness
-            );
-            this.userBaseline.maxWidth = Math.max(
-                this.userBaseline.maxWidth, 
-                metrics.width
-            );
-            
-            this.calibrationFrames++;
-            
-            // キャリブレーション完了
-            if (this.calibrationFrames >= this.calibrationMaxFrames) {
-                // 安全マージンを追加
-                this.userBaseline.maxOpenness *= this.calibrationMargin;
-                this.userBaseline.maxWidth *= this.calibrationMargin;
-                
-                // 最小値を設定（ゼロ除算を防ぐ）
-                if (this.userBaseline.maxOpenness < 0.001) {
-                    this.userBaseline.maxOpenness = 0.001;
-                }
-                if (this.userBaseline.maxWidth < 0.001) {
-                    this.userBaseline.maxWidth = 0.001;
-                }
-                
-                this.isCalibrating = false;
-                
-                // コールバックを呼び出し
-                if (this.onCalibrationComplete) {
-                    this.onCalibrationComplete(this.userBaseline);
-                }
-                
-                console.log('[VowelClassifier] キャリブレーション完了:', this.userBaseline);
-            }
-            
-            // キャリブレーション中は判別しない
-            return {
-                vowel: null,
-                confidence: 0,
-                probabilities: this._getEmptyProbabilities(),
-                metrics: {
-                    openness: metrics.openness,
-                    width: metrics.width,
-                    aspectRatio: metrics.aspectRatio,
-                    area: metrics.area
-                },
-                isCalibrating: true,
-                calibrationProgress: this.calibrationFrames / this.calibrationMaxFrames
-            };
-        }
-
-        // 正規化（動的に設定された基準値を使用）
-        // 基準値が0の場合は、正規化せずにそのまま使用（フォールバック）
-        const normOpenness = this.userBaseline.maxOpenness > 0.001 
-            ? Math.min(metrics.openness / this.userBaseline.maxOpenness, 2.0) // 最大2.0に制限
-            : metrics.openness;
-        const normWidth = this.userBaseline.maxWidth > 0.001 
-            ? Math.min(metrics.width / this.userBaseline.maxWidth, 2.0) // 最大2.0に制限
-            : metrics.width;
+        // 相対的な判定（正規化なし）
+        // 生の計測値をそのまま使用
+        const openness = metrics.openness;
+        const width = metrics.width;
         const aspectRatio = metrics.aspectRatio;
 
-        // 各母音のスコアを計算
-        const scores = this._calculateScores(normOpenness, normWidth, aspectRatio);
+        // 各母音のスコアを計算（相対的な判定）
+        const scores = this._calculateScoresRelative(openness, width, aspectRatio);
 
         // 最高スコアの母音を取得
         const maxScore = Math.max(...Object.values(scores));
@@ -172,8 +97,8 @@ export class VowelClassifier {
             probabilities: probabilities,
             scores: scores,
             metrics: {
-                openness: normOpenness,
-                width: normWidth,
+                openness: openness,
+                width: width,
                 aspectRatio: aspectRatio,
                 area: metrics.area
             }
@@ -188,52 +113,110 @@ export class VowelClassifier {
     }
 
     /**
-     * 各母音のスコアを計算
+     * 各母音のスコアを計算（相対的な判定）
+     * 正規化なしで、相対的な特徴量で判定
      * @private
      */
-    _calculateScores(normOpenness, normWidth, aspectRatio) {
+    _calculateScoresRelative(openness, width, aspectRatio) {
         const scores = {};
 
-        for (const [vowel, threshold] of Object.entries(this.thresholds.vowels)) {
-            let score = 0;
+        // 「あ」: 開き具合が大きい、アスペクト比が小さい（縦長）
+        scores['あ'] = this._scoreForA(openness, aspectRatio);
 
-            // 開き具合のマッチング
-            if (normOpenness >= threshold.openness.min && normOpenness <= threshold.openness.max) {
-                score += 0.4;
-            } else {
-                const distance = Math.min(
-                    Math.abs(normOpenness - threshold.openness.min),
-                    Math.abs(normOpenness - threshold.openness.max)
-                );
-                score += Math.max(0, 0.4 - distance * 2);
-            }
+        // 「い」: 幅が大きい、開き具合が小さい、アスペクト比が大きい（横長）
+        scores['い'] = this._scoreForI(openness, width, aspectRatio);
 
-            // 幅のマッチング
-            if (normWidth >= threshold.width.min && normWidth <= threshold.width.max) {
-                score += 0.3;
-            } else {
-                const distance = Math.min(
-                    Math.abs(normWidth - threshold.width.min),
-                    Math.abs(normWidth - threshold.width.max)
-                );
-                score += Math.max(0, 0.3 - distance * 2);
-            }
+        // 「う」: 開き具合が小さい、幅が小さい、アスペクト比が中程度（すぼめる）
+        scores['う'] = this._scoreForU(openness, width, aspectRatio);
 
-            // アスペクト比のマッチング
-            if (aspectRatio >= threshold.aspectRatio.min && aspectRatio <= threshold.aspectRatio.max) {
-                score += 0.3;
-            } else {
-                const distance = Math.min(
-                    Math.abs(aspectRatio - threshold.aspectRatio.min),
-                    Math.abs(aspectRatio - threshold.aspectRatio.max)
-                );
-                score += Math.max(0, 0.3 - distance * 0.5);
-            }
+        // 「え」: 開き具合が中程度、幅が大きい、アスペクト比が大きい（横に広げる）
+        scores['え'] = this._scoreForE(openness, width, aspectRatio);
 
-            scores[vowel] = Math.max(0, Math.min(1, score));
-        }
+        // 「お」: 開き具合が中程度、幅が中程度、アスペクト比が小さい（丸い）
+        scores['お'] = this._scoreForO(openness, width, aspectRatio);
 
         return scores;
+    }
+
+    /**
+     * 「あ」のスコアを計算
+     * 特徴: 開き具合が大きい、アスペクト比が小さい（縦長）
+     * @private
+     */
+    _scoreForA(openness, aspectRatio) {
+        // 開き具合が大きいほど高スコア（0.06以上で高スコア）
+        const opennessScore = Math.min(openness / 0.06, 1.0);
+        // アスペクト比が小さいほど高スコア（0.8以下で高スコア）
+        const aspectScore = aspectRatio < 0.8 ? 1.0 : Math.max(0, 1.0 - (aspectRatio - 0.8) * 2);
+        return (opennessScore * 0.6) + (aspectScore * 0.4);
+    }
+
+    /**
+     * 「い」のスコアを計算
+     * 特徴: 幅が大きい、開き具合が小さい、アスペクト比が大きい（横長）
+     * @private
+     */
+    _scoreForI(openness, width, aspectRatio) {
+        // 開き具合が小さいほど高スコア（0.03以下で高スコア）
+        const opennessScore = openness < 0.03 ? 1.0 : Math.max(0, 1.0 - (openness - 0.03) * 20);
+        // 幅が大きいほど高スコア（0.08以上で高スコア）
+        const widthScore = Math.min(width / 0.08, 1.0);
+        // アスペクト比が大きいほど高スコア（2.0以上で高スコア）
+        const aspectScore = aspectRatio > 2.0 ? Math.min((aspectRatio - 2.0) / 2.0, 1.0) : Math.max(0, aspectRatio / 2.0);
+        return (opennessScore * 0.3) + (widthScore * 0.4) + (aspectScore * 0.3);
+    }
+
+    /**
+     * 「う」のスコアを計算
+     * 特徴: 開き具合が小さい、幅が小さい、アスペクト比が中程度（すぼめる）
+     * @private
+     */
+    _scoreForU(openness, width, aspectRatio) {
+        // 開き具合が小さいほど高スコア（0.02以下で高スコア）
+        const opennessScore = openness < 0.02 ? 1.0 : Math.max(0, 1.0 - (openness - 0.02) * 30);
+        // 幅が小さいほど高スコア（0.06以下で高スコア）
+        const widthScore = width < 0.06 ? 1.0 : Math.max(0, 1.0 - (width - 0.06) * 15);
+        // アスペクト比が中程度（1.5-3.0）で高スコア
+        const aspectScore = aspectRatio >= 1.5 && aspectRatio <= 3.0 
+            ? 1.0 
+            : Math.max(0, 1.0 - Math.min(Math.abs(aspectRatio - 2.25) / 1.5, 1.0));
+        return (opennessScore * 0.4) + (widthScore * 0.4) + (aspectScore * 0.2);
+    }
+
+    /**
+     * 「え」のスコアを計算
+     * 特徴: 開き具合が中程度、幅が大きい、アスペクト比が大きい（横に広げる）
+     * @private
+     */
+    _scoreForE(openness, width, aspectRatio) {
+        // 開き具合が中程度（0.03-0.05）で高スコア
+        const opennessScore = openness >= 0.03 && openness <= 0.05 
+            ? 1.0 
+            : Math.max(0, 1.0 - Math.abs(openness - 0.04) * 25);
+        // 幅が大きいほど高スコア（0.07以上で高スコア）
+        const widthScore = Math.min(width / 0.07, 1.0);
+        // アスペクト比が大きいほど高スコア（1.5以上で高スコア）
+        const aspectScore = aspectRatio > 1.5 ? Math.min((aspectRatio - 1.5) / 1.0, 1.0) : Math.max(0, aspectRatio / 1.5);
+        return (opennessScore * 0.3) + (widthScore * 0.4) + (aspectScore * 0.3);
+    }
+
+    /**
+     * 「お」のスコアを計算
+     * 特徴: 開き具合が中程度、幅が中程度、アスペクト比が小さい（丸い）
+     * @private
+     */
+    _scoreForO(openness, width, aspectRatio) {
+        // 開き具合が中程度（0.05-0.08）で高スコア
+        const opennessScore = openness >= 0.05 && openness <= 0.08 
+            ? 1.0 
+            : Math.max(0, 1.0 - Math.abs(openness - 0.065) * 20);
+        // 幅が中程度（0.05-0.10）で高スコア
+        const widthScore = width >= 0.05 && width <= 0.10 
+            ? 1.0 
+            : Math.max(0, 1.0 - Math.abs(width - 0.075) * 15);
+        // アスペクト比が小さいほど高スコア（1.5以下で高スコア）
+        const aspectScore = aspectRatio < 1.5 ? 1.0 : Math.max(0, 1.0 - (aspectRatio - 1.5) * 1.0);
+        return (opennessScore * 0.4) + (widthScore * 0.3) + (aspectScore * 0.3);
     }
 
     /**
@@ -269,49 +252,11 @@ export class VowelClassifier {
     }
 
     /**
-     * ユーザー基準値を設定（キャリブレーション）
-     * @param {Object} baseline - 基準値 {maxOpenness, maxWidth}
-     */
-    setUserBaseline(baseline) {
-        this.userBaseline = { ...this.userBaseline, ...baseline };
-    }
-
-    /**
      * 閾値を設定
      * @param {Object} thresholds - 閾値設定
      */
     setThresholds(thresholds) {
         this.thresholds = { ...this.thresholds, ...thresholds };
-    }
-
-    /**
-     * キャリブレーションを実行
-     * ユーザーが各母音を発音したデータから基準値を計算
-     * @param {Array} calibrationData - キャリブレーションデータ [{vowel: 'あ', metrics: {...}}, ...]
-     */
-    calibrate(calibrationData) {
-        if (!calibrationData || calibrationData.length === 0) {
-            return;
-        }
-
-        // 各母音の最大値を計算
-        let maxOpenness = 0;
-        let maxWidth = 0;
-
-        for (const data of calibrationData) {
-            if (data.metrics) {
-                maxOpenness = Math.max(maxOpenness, data.metrics.openness || 0);
-                maxWidth = Math.max(maxWidth, data.metrics.width || 0);
-            }
-        }
-
-        // 基準値を設定
-        if (maxOpenness > 0) {
-            this.userBaseline.maxOpenness = maxOpenness;
-        }
-        if (maxWidth > 0) {
-            this.userBaseline.maxWidth = maxWidth;
-        }
     }
 }
 
