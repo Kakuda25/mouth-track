@@ -160,11 +160,8 @@ export class FaceMeshHandler {
 
         const landmarks = results.multiFaceLandmarks[0];
 
-        // 重複を削除
-        const uniqueIndices = [...new Set(MOUTH_CONTOUR_INDICES)];
-
         // ランドマークを取得（存在するもののみ）
-        const contourLandmarks = uniqueIndices
+        const contourLandmarks = MOUTH_CONTOUR_INDICES
             .map(index => {
                 if (landmarks[index]) {
                     return {

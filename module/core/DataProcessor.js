@@ -119,7 +119,7 @@ export class DataProcessor {
             [12, 13, 14, 15, 16, 17, 18].includes(lm.index)
         ).map(lm => lm.point || lm);
 
-        // 下唇外側の点（14-18、重複あり）
+
         const bottomOuterPoints = contourLandmarks.filter(lm => 
             [14, 15, 16, 17, 18].includes(lm.index)
         ).map(lm => lm.point || lm);

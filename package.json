@@ -7,7 +7,9 @@
   "exports": {
     ".": "./module/index.js",
     "./core": "./module/core/index.js",
-    "./utils": "./module/utils/index.js"
+    "./utils": "./module/utils/index.js",
+    "./config": "./module/config/constants.js",
+    "./ui": "./module/ui/Visualizer.js"
   },
   "scripts": {
     "start": "npx http-server . -p 8080 -o",

@@ -3,8 +3,6 @@
  * 口の形状から日本語の5つの母音（あ、い、う、え、お）を判別します
  */
 
-import { DataProcessor } from './DataProcessor.js';
-
 /**
  * 母音判別クラス
  */
@@ -43,22 +41,31 @@ export class VowelClassifier {
         };
 
         // ユーザー基準値（キャリブレーション用）
+        // 初期値は0に設定（動的に更新される）
         this.userBaseline = {
-            maxOpenness: 1.0,
-            maxWidth: 1.0
+            maxOpenness: 0,
+            maxWidth: 0
         };
+
+        // キャリブレーション設定
+        this.calibrationFrames = 0;
+        this.calibrationMaxFrames = options.calibrationFrames || 90; // デフォルト3秒（30fps × 3秒）
+        this.isCalibrating = options.autoCalibrate !== false; // デフォルトで自動キャリブレーション有効
+        this.calibrationMargin = options.calibrationMargin || 1.2; // 20%のマージン
 
         // コールバック関数
         this.onVowelDetected = options.onVowelDetected || null;
+        this.onCalibrationComplete = options.onCalibrationComplete || null;
 
         // カスタム閾値の適用
         if (options.thresholds) {
             this.thresholds = { ...this.thresholds, ...options.thresholds };
         }
 
-        // ユーザー基準値の適用
+        // ユーザー基準値の適用（手動設定の場合）
         if (options.userBaseline) {
             this.userBaseline = { ...this.userBaseline, ...options.userBaseline };
+            this.isCalibrating = false; // 手動設定の場合はキャリブレーションをスキップ
         }
     }
 
@@ -77,9 +84,67 @@ export class VowelClassifier {
             };
         }
 
-        // 正規化（ユーザー基準値を使用）
-        const normOpenness = metrics.openness / this.userBaseline.maxOpenness;
-        const normWidth = metrics.width / this.userBaseline.maxWidth;
+        // キャリブレーション中は最大値を記録
+        if (this.isCalibrating) {
+            this.userBaseline.maxOpenness = Math.max(
+                this.userBaseline.maxOpenness, 
+                metrics.openness
+            );
+            this.userBaseline.maxWidth = Math.max(
+                this.userBaseline.maxWidth, 
+                metrics.width
+            );
+            
+            this.calibrationFrames++;
+            
+            // キャリブレーション完了
+            if (this.calibrationFrames >= this.calibrationMaxFrames) {
+                // 安全マージンを追加
+                this.userBaseline.maxOpenness *= this.calibrationMargin;
+                this.userBaseline.maxWidth *= this.calibrationMargin;
+                
+                // 最小値を設定（ゼロ除算を防ぐ）
+                if (this.userBaseline.maxOpenness < 0.001) {
+                    this.userBaseline.maxOpenness = 0.001;
+                }
+                if (this.userBaseline.maxWidth < 0.001) {
+                    this.userBaseline.maxWidth = 0.001;
+                }
+                
+                this.isCalibrating = false;
+                
+                // コールバックを呼び出し
+                if (this.onCalibrationComplete) {
+                    this.onCalibrationComplete(this.userBaseline);
+                }
+                
+                console.log('[VowelClassifier] キャリブレーション完了:', this.userBaseline);
+            }
+            
+            // キャリブレーション中は判別しない
+            return {
+                vowel: null,
+                confidence: 0,
+                probabilities: this._getEmptyProbabilities(),
+                metrics: {
+                    openness: metrics.openness,
+                    width: metrics.width,
+                    aspectRatio: metrics.aspectRatio,
+                    area: metrics.area
+                },
+                isCalibrating: true,
+                calibrationProgress: this.calibrationFrames / this.calibrationMaxFrames
+            };
+        }
+
+        // 正規化（動的に設定された基準値を使用）
+        // 基準値が0の場合は、正規化せずにそのまま使用（フォールバック）
+        const normOpenness = this.userBaseline.maxOpenness > 0.001 
+            ? Math.min(metrics.openness / this.userBaseline.maxOpenness, 2.0) // 最大2.0に制限
+            : metrics.openness;
+        const normWidth = this.userBaseline.maxWidth > 0.001 
+            ? Math.min(metrics.width / this.userBaseline.maxWidth, 2.0) // 最大2.0に制限
+            : metrics.width;
         const aspectRatio = metrics.aspectRatio;
 
         // 各母音のスコアを計算

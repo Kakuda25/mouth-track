@@ -8,11 +8,12 @@ import { DataProcessor } from './DataProcessor.js';
 import { Smoother } from '../utils/Smoother.js';
 
 export class MouthTracker {
-    constructor(videoElement, onDataUpdate) {
+    constructor(videoElement, onDataUpdate, options = {}) {
         this.videoElement = videoElement;
         this.onDataUpdate = onDataUpdate || (() => { });
         this.faceMeshHandler = new FaceMeshHandler();
-        this.smoother = new Smoother(0.5);
+        // 依存性注入: Smootherをカスタマイズ可能にする
+        this.smoother = options.smoother || new Smoother(options.smoothingFactor || 0.5);
         this.isTracking = false;
         this.animationFrameId = null;
         this.lastMetrics = null;
