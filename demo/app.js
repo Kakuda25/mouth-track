@@ -3,10 +3,10 @@
  * 各モジュールを初期化し、アプリケーションを起動します
  */
 
-import { CameraManager } from './core/CameraManager.js';
-import { ErrorHandler } from './utils/ErrorHandler.js';
-import { MouthTracker } from './core/MouthTracker.js';
-import { Visualizer } from './ui/Visualizer.js';
+import { CameraManager } from '../module/core/CameraManager.js';
+import { ErrorHandler } from '../module/utils/ErrorHandler.js';
+import { MouthTracker } from '../module/core/MouthTracker.js';
+import { Visualizer } from '../module/ui/Visualizer.js';
 
 // アプリケーション初期化
 document.addEventListener('DOMContentLoaded', async () => {

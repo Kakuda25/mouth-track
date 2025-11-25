@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "description": "リアルタイム口の動きトラッキングモジュール",
   "type": "module",
-  "main": "js/index.js",
+  "main": "module/index.js",
   "exports": {
-    ".": "./js/index.js",
-    "./core": "./js/core/index.js",
-    "./utils": "./js/utils/index.js"
+    ".": "./module/index.js",
+    "./core": "./module/core/index.js",
+    "./utils": "./module/utils/index.js"
   },
   "scripts": {
     "start": "npx http-server . -p 8080 -o",
