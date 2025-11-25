@@ -2,7 +2,8 @@
 node_modules/
 package-lock.json
 yarn.lock
-
+docs/
+order/
 # Build outputs
 dist/
 build/
@@ -43,4 +44,3 @@ coverage/
 
 # MediaPipe models (will be downloaded from CDN)
 models/
-
