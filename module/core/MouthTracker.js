@@ -6,6 +6,7 @@
 import { FaceMeshHandler } from './FaceMeshHandler.js';
 import { DataProcessor } from './DataProcessor.js';
 import { Smoother } from '../utils/Smoother.js';
+import { TemporalFeatureExtractor } from './TemporalFeatureExtractor.js';
 
 export class MouthTracker {
     constructor(videoElement, onDataUpdate, options = {}) {
@@ -14,6 +15,10 @@ export class MouthTracker {
         this.faceMeshHandler = new FaceMeshHandler();
         // 依存性注入: Smootherをカスタマイズ可能にする
         this.smoother = options.smoother || new Smoother(options.smoothingFactor || 0.5);
+        // 時間的特徴量抽出器を初期化
+        this.temporalExtractor = options.temporalExtractor || new TemporalFeatureExtractor({
+            bufferSize: options.temporalBufferSize || 30
+        });
         this.isTracking = false;
         this.animationFrameId = null;
         this.lastMetrics = null;
@@ -101,6 +106,10 @@ export class MouthTracker {
         }
         this.lastMetrics = metrics;
 
+        // 時間的特徴量を計算
+        this.temporalExtractor.addFrame(metrics);
+        const temporalFeatures = this.temporalExtractor.getAllTemporalFeatures();
+
         // FPS計算
         this.updateFPS();
 
@@ -124,6 +133,7 @@ export class MouthTracker {
             landmarks: smoothedLandmarks,
             allLandmarks: smoothedAllLandmarks,
             metrics: metrics,
+            temporalFeatures: temporalFeatures,
             confidence: confidence,
             fps: this.fpsCounter.currentFps,
             timestamp: Date.now(),
@@ -164,6 +174,7 @@ export class MouthTracker {
 
         this.isTracking = true;
         this.smoother.reset();
+        this.temporalExtractor.reset();
         this.lastMetrics = null;
         this.fpsCounter = {
             frames: 0,

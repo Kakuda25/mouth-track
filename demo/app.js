@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         vowelValue.className = result.vowel ? 'vowel-value detected' : 'vowel-value';
                     }
                     if (vowelConfidenceValue) {
-                        vowelConfidenceValue.textContent = result.vowel ? 
+                        vowelConfidenceValue.textContent = result.vowel ?
                             `信頼度: ${(result.confidence * 100).toFixed(1)}%` : '-';
                         vowelConfidenceValue.className = result.vowel ? 'vowel-confidence active' : 'vowel-confidence';
                     }
@@ -171,8 +171,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // 母音判別を実行
                     if (data.metrics && vowelClassifier) {
-                        const result = vowelClassifier.classify(data.metrics);
-                        
+                        const result = vowelClassifier.classify(data.metrics, data.temporalFeatures);
+
                         // デバッグ: 実際の計測値をログ出力（最初の10フレームのみ）
                         if (result.metrics && (!window._debugFrameCount || window._debugFrameCount < 10)) {
                             window._debugFrameCount = (window._debugFrameCount || 0) + 1;
@@ -180,8 +180,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 metrics: {
                                     openness: data.metrics.openness?.toFixed(4),
                                     width: data.metrics.width?.toFixed(4),
-                                    aspectRatio: data.metrics.aspectRatio?.toFixed(2)
+                                    aspectRatio: data.metrics.aspectRatio?.toFixed(2),
+                                    upperLipThickness: data.metrics.upperLipThickness?.toFixed(4),
+                                    lowerLipThickness: data.metrics.lowerLipThickness?.toFixed(4),
+                                    circularity: data.metrics.circularity?.toFixed(3)
                                 },
+                                temporalFeatures: data.temporalFeatures ? {
+                                    opennessVelocity: data.temporalFeatures.openness?.velocity?.toFixed(4),
+                                    widthVelocity: data.temporalFeatures.width?.velocity?.toFixed(4)
+                                } : null,
                                 scores: result.scores,
                                 vowel: result.vowel,
                                 confidence: result.confidence?.toFixed(2)
@@ -201,7 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             overlayInfo.classList.remove('error');
                             overlayInfo.style.display = 'block';
                             visualizer.clear();
-                            
+
                             // 母音表示をリセット
                             if (vowelValue) {
                                 vowelValue.textContent = '-';

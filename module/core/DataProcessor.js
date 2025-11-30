@@ -115,56 +115,56 @@ export class DataProcessor {
         }
 
         // 上唇外側の点（12-18）
-        const topOuterPoints = contourLandmarks.filter(lm => 
+        const topOuterPoints = contourLandmarks.filter(lm =>
             [12, 13, 14, 15, 16, 17, 18].includes(lm.index)
         ).map(lm => lm.point || lm);
 
 
-        const bottomOuterPoints = contourLandmarks.filter(lm => 
+        const bottomOuterPoints = contourLandmarks.filter(lm =>
             [14, 15, 16, 17, 18].includes(lm.index)
         ).map(lm => lm.point || lm);
 
         // 上唇内側の点（78-82）
-        const topInnerPoints = contourLandmarks.filter(lm => 
+        const topInnerPoints = contourLandmarks.filter(lm =>
             [78, 79, 80, 81, 82].includes(lm.index)
         ).map(lm => lm.point || lm);
 
         // 下唇内側の点（308-312）
-        const bottomInnerPoints = contourLandmarks.filter(lm => 
+        const bottomInnerPoints = contourLandmarks.filter(lm =>
             [308, 309, 310, 311, 312].includes(lm.index)
         ).map(lm => lm.point || lm);
 
         // 口角の点（61, 291）
-        const cornerPoints = contourLandmarks.filter(lm => 
+        const cornerPoints = contourLandmarks.filter(lm =>
             [61, 291].includes(lm.index)
         ).map(lm => lm.point || lm);
 
         // 平均点を計算
-        const topOuterAvg = this.calculateAveragePoint(topOuterPoints) || 
-                           (basicLandmarks?.topOuter ? { x: basicLandmarks.topOuter.x, y: basicLandmarks.topOuter.y, z: basicLandmarks.topOuter.z || 0 } : null);
-        const bottomOuterAvg = this.calculateAveragePoint(bottomOuterPoints) || 
-                              (basicLandmarks?.bottomOuter ? { x: basicLandmarks.bottomOuter.x, y: basicLandmarks.bottomOuter.y, z: basicLandmarks.bottomOuter.z || 0 } : null);
-        const leftCorner = cornerPoints.find(p => p.x < 0.5) || 
-                          (basicLandmarks?.leftEnd ? { x: basicLandmarks.leftEnd.x, y: basicLandmarks.leftEnd.y, z: basicLandmarks.leftEnd.z || 0 } : null);
-        const rightCorner = cornerPoints.find(p => p.x >= 0.5) || 
-                           (basicLandmarks?.rightEnd ? { x: basicLandmarks.rightEnd.x, y: basicLandmarks.rightEnd.y, z: basicLandmarks.rightEnd.z || 0 } : null);
+        const topOuterAvg = this.calculateAveragePoint(topOuterPoints) ||
+            (basicLandmarks?.topOuter ? { x: basicLandmarks.topOuter.x, y: basicLandmarks.topOuter.y, z: basicLandmarks.topOuter.z || 0 } : null);
+        const bottomOuterAvg = this.calculateAveragePoint(bottomOuterPoints) ||
+            (basicLandmarks?.bottomOuter ? { x: basicLandmarks.bottomOuter.x, y: basicLandmarks.bottomOuter.y, z: basicLandmarks.bottomOuter.z || 0 } : null);
+        const leftCorner = cornerPoints.find(p => p.x < 0.5) ||
+            (basicLandmarks?.leftEnd ? { x: basicLandmarks.leftEnd.x, y: basicLandmarks.leftEnd.y, z: basicLandmarks.leftEnd.z || 0 } : null);
+        const rightCorner = cornerPoints.find(p => p.x >= 0.5) ||
+            (basicLandmarks?.rightEnd ? { x: basicLandmarks.rightEnd.x, y: basicLandmarks.rightEnd.y, z: basicLandmarks.rightEnd.z || 0 } : null);
 
         // 計測値を計算
-        const openness = (topOuterAvg && bottomOuterAvg) ? 
-            this.distance(topOuterAvg, bottomOuterAvg) : 
+        const openness = (topOuterAvg && bottomOuterAvg) ?
+            this.distance(topOuterAvg, bottomOuterAvg) :
             this.calculateOpenness(basicLandmarks);
-        
-        const width = (leftCorner && rightCorner) ? 
-            this.distance(leftCorner, rightCorner) : 
+
+        const width = (leftCorner && rightCorner) ?
+            this.distance(leftCorner, rightCorner) :
             this.calculateWidth(basicLandmarks);
 
-        const area = this.calculateArea({ 
-            topOuter: topOuterAvg, 
-            bottomOuter: bottomOuterAvg, 
-            leftEnd: leftCorner, 
-            rightEnd: rightCorner 
+        const area = this.calculateArea({
+            topOuter: topOuterAvg,
+            bottomOuter: bottomOuterAvg,
+            leftEnd: leftCorner,
+            rightEnd: rightCorner
         });
-        
+
         const aspectRatio = width / (openness + 0.0001);
 
         return {
@@ -176,24 +176,245 @@ export class DataProcessor {
     }
 
     /**
+     * 上唇の厚さを計算
+     * 上唇外側と内側の平均距離
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {number} 上唇の厚さ
+     */
+    static calculateUpperLipThickness(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return 0;
+        }
+
+        // 上唇外側の点（12-18）
+        const topOuterPoints = contourLandmarks.filter(lm =>
+            [12, 13, 14, 15, 16, 17, 18].includes(lm.index)
+        ).map(lm => lm.point || lm);
+
+        // 上唇内側の点（78-82）
+        const topInnerPoints = contourLandmarks.filter(lm =>
+            [78, 79, 80, 81, 82].includes(lm.index)
+        ).map(lm => lm.point || lm);
+
+        if (topOuterPoints.length === 0 || topInnerPoints.length === 0) {
+            return 0;
+        }
+
+        // 各外側点に対して最も近い内側点との距離を計算
+        const distances = topOuterPoints.map(outerPoint => {
+            const minDistance = Math.min(...topInnerPoints.map(innerPoint =>
+                this.distance(outerPoint, innerPoint)
+            ));
+            return minDistance;
+        });
+
+        // 平均距離を返す
+        return distances.reduce((sum, d) => sum + d, 0) / distances.length;
+    }
+
+    /**
+     * 下唇の厚さを計算
+     * 下唇外側と内側の平均距離
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {number} 下唇の厚さ
+     */
+    static calculateLowerLipThickness(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return 0;
+        }
+
+        // 下唇外側の点（14-18の一部を使用、実際には下唇外側の適切な点）
+        // MediaPipeのランドマークに基づいて調整が必要な場合があります
+        const bottomOuterPoints = contourLandmarks.filter(lm =>
+            [14, 15, 16, 17, 18].includes(lm.index)
+        ).map(lm => lm.point || lm);
+
+        // 下唇内側の点（308-312）
+        const bottomInnerPoints = contourLandmarks.filter(lm =>
+            [308, 309, 310, 311, 312].includes(lm.index)
+        ).map(lm => lm.point || lm);
+
+        if (bottomOuterPoints.length === 0 || bottomInnerPoints.length === 0) {
+            return 0;
+        }
+
+        // 各外側点に対して最も近い内側点との距離を計算
+        const distances = bottomOuterPoints.map(outerPoint => {
+            const minDistance = Math.min(...bottomInnerPoints.map(innerPoint =>
+                this.distance(outerPoint, innerPoint)
+            ));
+            return minDistance;
+        });
+
+        // 平均距離を返す
+        return distances.reduce((sum, d) => sum + d, 0) / distances.length;
+    }
+
+    /**
+     * 口角の角度を計算
+     * 口角が上がっているか下がっているかを示す角度（ラジアン）
+     * @param {Object} mouthLandmarks - 口ランドマーク
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {Object} 左右の口角の角度 {left, right, average}
+     */
+    static calculateMouthCornerAngle(mouthLandmarks, contourLandmarks) {
+        if (!mouthLandmarks || !mouthLandmarks.leftEnd || !mouthLandmarks.rightEnd) {
+            return { left: 0, right: 0, average: 0 };
+        }
+
+        // 口の中心点を計算（上唇と下唇の中間）
+        const centerY = mouthLandmarks.topOuter && mouthLandmarks.bottomOuter
+            ? (mouthLandmarks.topOuter.y + mouthLandmarks.bottomOuter.y) / 2
+            : 0.5;
+
+        // 左口角の角度（正の値は上向き、負の値は下向き）
+        const leftAngle = Math.atan2(
+            centerY - mouthLandmarks.leftEnd.y,
+            mouthLandmarks.leftEnd.x - (mouthLandmarks.topOuter?.x || 0.5)
+        );
+
+        // 右口角の角度
+        const rightAngle = Math.atan2(
+            centerY - mouthLandmarks.rightEnd.y,
+            (mouthLandmarks.topOuter?.x || 0.5) - mouthLandmarks.rightEnd.x
+        );
+
+        return {
+            left: leftAngle,
+            right: rightAngle,
+            average: (leftAngle + rightAngle) / 2
+        };
+    }
+
+    /**
+     * 唇の曲率を計算
+     * 上唇と下唇の曲がり具合を測定
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {Object} 上唇と下唇の曲率 {upper, lower, average}
+     */
+    static calculateLipCurvature(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return { upper: 0, lower: 0, average: 0 };
+        }
+
+        // 上唇外側の点（12-18）
+        const topOuterPoints = contourLandmarks.filter(lm =>
+            [12, 13, 14, 15, 16, 17, 18].includes(lm.index)
+        ).map(lm => lm.point || lm);
+
+        // 下唇外側の点（適切なインデックスを使用）
+        const bottomOuterPoints = contourLandmarks.filter(lm =>
+            [14, 15, 16, 17, 18].includes(lm.index)
+        ).map(lm => lm.point || lm);
+
+        // 曲率を計算する補助関数
+        const calculateCurvature = (points) => {
+            if (points.length < 3) return 0;
+
+            // 両端の点を結ぶ直線からの最大垂直距離を計算
+            const start = points[0];
+            const end = points[points.length - 1];
+            const lineLength = this.distance(start, end);
+
+            if (lineLength === 0) return 0;
+
+            let maxDistance = 0;
+            for (let i = 1; i < points.length - 1; i++) {
+                const point = points[i];
+                // 点から直線への距離を計算
+                const distance = Math.abs(
+                    (end.y - start.y) * point.x -
+                    (end.x - start.x) * point.y +
+                    end.x * start.y - end.y * start.x
+                ) / lineLength;
+                maxDistance = Math.max(maxDistance, distance);
+            }
+
+            return maxDistance;
+        };
+
+        const upperCurvature = calculateCurvature(topOuterPoints);
+        const lowerCurvature = calculateCurvature(bottomOuterPoints);
+
+        return {
+            upper: upperCurvature,
+            lower: lowerCurvature,
+            average: (upperCurvature + lowerCurvature) / 2
+        };
+    }
+
+    /**
+     * 口の円形度を計算
+     * 口の形状がどれだけ円に近いかを測定（0-1、1が完全な円）
+     * @param {number} area - 口の面積
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {number} 円形度
+     */
+    static calculateCircularity(area, contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0 || area === 0) {
+            return 0;
+        }
+
+        // 輪郭の周長を計算
+        let perimeter = 0;
+        const points = contourLandmarks.map(lm => lm.point || lm);
+
+        for (let i = 0; i < points.length; i++) {
+            const current = points[i];
+            const next = points[(i + 1) % points.length];
+            perimeter += this.distance(current, next);
+        }
+
+        if (perimeter === 0) return 0;
+
+        // 円形度 = 4π × 面積 / 周長²
+        // 完全な円の場合は1、細長い形状ほど0に近づく
+        const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
+
+        // 0-1の範囲にクランプ
+        return Math.min(Math.max(circularity, 0), 1);
+    }
+
+    /**
      * ランドマークデータから全計測値を計算
      * @param {Object} mouthLandmarks - 口ランドマーク
      * @param {Array} contourLandmarks - 口の輪郭ランドマーク（オプション、より正確な計測に使用）
      * @returns {Object} 計測値
      */
     static calculateAllMetrics(mouthLandmarks, contourLandmarks = null) {
+        // 基本的な計測値
+        let metrics;
+
         // 輪郭ランドマークが提供されている場合は、それを使用
         if (contourLandmarks && contourLandmarks.length > 0) {
-            return this.calculateMetricsFromContour(contourLandmarks, mouthLandmarks);
+            metrics = this.calculateMetricsFromContour(contourLandmarks, mouthLandmarks);
+        } else {
+            // フォールバック: 基本ランドマークを使用
+            metrics = {
+                openness: this.calculateOpenness(mouthLandmarks),
+                width: this.calculateWidth(mouthLandmarks),
+                area: this.calculateArea(mouthLandmarks),
+                aspectRatio: this.calculateAspectRatio(mouthLandmarks)
+            };
         }
 
-        // フォールバック: 基本ランドマークを使用
-        return {
-            openness: this.calculateOpenness(mouthLandmarks),
-            width: this.calculateWidth(mouthLandmarks),
-            area: this.calculateArea(mouthLandmarks),
-            aspectRatio: this.calculateAspectRatio(mouthLandmarks)
-        };
+        // 新しい空間的特徴量を追加（輪郭ランドマークが利用可能な場合のみ）
+        if (contourLandmarks && contourLandmarks.length > 0) {
+            metrics.upperLipThickness = this.calculateUpperLipThickness(contourLandmarks);
+            metrics.lowerLipThickness = this.calculateLowerLipThickness(contourLandmarks);
+            metrics.mouthCornerAngle = this.calculateMouthCornerAngle(mouthLandmarks, contourLandmarks);
+            metrics.lipCurvature = this.calculateLipCurvature(contourLandmarks);
+            metrics.circularity = this.calculateCircularity(metrics.area, contourLandmarks);
+        } else {
+            // 輪郭ランドマークがない場合はデフォルト値
+            metrics.upperLipThickness = 0;
+            metrics.lowerLipThickness = 0;
+            metrics.mouthCornerAngle = { left: 0, right: 0, average: 0 };
+            metrics.lipCurvature = { upper: 0, lower: 0, average: 0 };
+            metrics.circularity = 0;
+        }
+
+        return metrics;
     }
 }
 
