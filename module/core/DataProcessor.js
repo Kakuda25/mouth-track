@@ -5,6 +5,32 @@
 
 export class DataProcessor {
     /**
+     * ランドマーク配列のバリデーション
+     * @private
+     * @param {Array} contourLandmarks - ランドマーク配列
+     * @returns {boolean} 有効な場合true
+     */
+    static _validateContourLandmarks(contourLandmarks) {
+        return contourLandmarks && contourLandmarks.length > 0;
+    }
+
+    /**
+     * ランドマークをフィルタリングしてポイント配列を取得
+     * @private
+     * @param {Array} contourLandmarks - ランドマーク配列
+     * @param {Array} indices - フィルタリングするインデックス配列
+     * @returns {Array} ポイント配列
+     */
+    static _filterLandmarksByIndices(contourLandmarks, indices) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
+            return [];
+        }
+        return contourLandmarks
+            .filter(lm => indices.includes(lm.index))
+            .map(lm => lm.point || lm);
+    }
+
+    /**
      * 2点間の距離を計算
      * @param {Object} point1 - 点1 {x, y, z}
      * @param {Object} point2 - 点2 {x, y, z}
@@ -106,29 +132,15 @@ export class DataProcessor {
      * @returns {Object} 計測値
      */
     static calculateMetricsFromContour(contourLandmarks, basicLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return this.calculateAllMetrics(basicLandmarks);
         }
 
-        const topOuterPoints = contourLandmarks.filter(lm =>
-            [12, 13, 14, 15, 16, 17, 18].includes(lm.index)
-        ).map(lm => lm.point || lm);
-
-        const bottomOuterPoints = contourLandmarks.filter(lm =>
-            [14, 15, 16, 17, 18].includes(lm.index)
-        ).map(lm => lm.point || lm);
-
-        const topInnerPoints = contourLandmarks.filter(lm =>
-            [78, 79, 80, 81, 82].includes(lm.index)
-        ).map(lm => lm.point || lm);
-
-        const bottomInnerPoints = contourLandmarks.filter(lm =>
-            [308, 309, 310, 311, 312].includes(lm.index)
-        ).map(lm => lm.point || lm);
-
-        const cornerPoints = contourLandmarks.filter(lm =>
-            [61, 291].includes(lm.index)
-        ).map(lm => lm.point || lm);
+        const topOuterPoints = this._filterLandmarksByIndices(contourLandmarks, [12, 13, 14, 15, 16, 17, 18]);
+        const bottomOuterPoints = this._filterLandmarksByIndices(contourLandmarks, [14, 15, 16, 17, 18]);
+        const topInnerPoints = this._filterLandmarksByIndices(contourLandmarks, [78, 79, 80, 81, 82]);
+        const bottomInnerPoints = this._filterLandmarksByIndices(contourLandmarks, [308, 309, 310, 311, 312]);
+        const cornerPoints = this._filterLandmarksByIndices(contourLandmarks, [61, 291]);
 
         const topOuterAvg = this.calculateAveragePoint(topOuterPoints) ||
             (basicLandmarks?.topOuter ? { x: basicLandmarks.topOuter.x, y: basicLandmarks.topOuter.y, z: basicLandmarks.topOuter.z || 0 } : null);
@@ -171,17 +183,12 @@ export class DataProcessor {
      * @returns {number} 上唇の厚さ
      */
     static calculateUpperLipThickness(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return 0;
         }
 
-        const topOuterPoints = contourLandmarks.filter(lm =>
-            [12, 13, 14, 15, 16, 17, 18].includes(lm.index)
-        ).map(lm => lm.point || lm);
-
-        const topInnerPoints = contourLandmarks.filter(lm =>
-            [78, 79, 80, 81, 82].includes(lm.index)
-        ).map(lm => lm.point || lm);
+        const topOuterPoints = this._filterLandmarksByIndices(contourLandmarks, [12, 13, 14, 15, 16, 17, 18]);
+        const topInnerPoints = this._filterLandmarksByIndices(contourLandmarks, [78, 79, 80, 81, 82]);
 
         if (topOuterPoints.length === 0 || topInnerPoints.length === 0) {
             return 0;
@@ -204,17 +211,12 @@ export class DataProcessor {
      * @returns {number} 下唇の厚さ
      */
     static calculateLowerLipThickness(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return 0;
         }
 
-        const bottomOuterPoints = contourLandmarks.filter(lm =>
-            [14, 15, 16, 17, 18].includes(lm.index)
-        ).map(lm => lm.point || lm);
-
-        const bottomInnerPoints = contourLandmarks.filter(lm =>
-            [308, 309, 310, 311, 312].includes(lm.index)
-        ).map(lm => lm.point || lm);
+        const bottomOuterPoints = this._filterLandmarksByIndices(contourLandmarks, [14, 15, 16, 17, 18]);
+        const bottomInnerPoints = this._filterLandmarksByIndices(contourLandmarks, [308, 309, 310, 311, 312]);
 
         if (bottomOuterPoints.length === 0 || bottomInnerPoints.length === 0) {
             return 0;
@@ -270,17 +272,12 @@ export class DataProcessor {
      * @returns {Object} 上唇と下唇の曲率 {upper, lower, average}
      */
     static calculateLipCurvature(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return { upper: 0, lower: 0, average: 0 };
         }
 
-        const topOuterPoints = contourLandmarks.filter(lm =>
-            [12, 13, 14, 15, 16, 17, 18].includes(lm.index)
-        ).map(lm => lm.point || lm);
-
-        const bottomOuterPoints = contourLandmarks.filter(lm =>
-            [14, 15, 16, 17, 18].includes(lm.index)
-        ).map(lm => lm.point || lm);
+        const topOuterPoints = this._filterLandmarksByIndices(contourLandmarks, [12, 13, 14, 15, 16, 17, 18]);
+        const bottomOuterPoints = this._filterLandmarksByIndices(contourLandmarks, [14, 15, 16, 17, 18]);
 
         const calculateCurvature = (points) => {
             if (points.length < 3) return 0;
@@ -323,7 +320,7 @@ export class DataProcessor {
      * @returns {number} 円形度
      */
     static calculateCircularity(area, contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0 || area === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks) || area === 0) {
             return 0;
         }
 
@@ -368,7 +365,7 @@ export class DataProcessor {
      * @returns {Object} 口角の動き {left, right, average}
      */
     static calculateCornerMovement(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return { left: 0, right: 0, average: 0 };
         }
 
@@ -399,7 +396,7 @@ export class DataProcessor {
      * @returns {Object} 頬の動き {left, right, average}
      */
     static calculateCheekMovement(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return { left: 0, right: 0, average: 0 };
         }
 
@@ -436,7 +433,7 @@ export class DataProcessor {
      * @returns {number} 顎の動き（口の中心からの距離）
      */
     static calculateJawMovement(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return 0;
         }
 
@@ -460,7 +457,7 @@ export class DataProcessor {
      * @returns {number} 楕円度（長軸/短軸比）
      */
     static calculateMouthEllipticity(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length < 3) {
+        if (!this._validateContourLandmarks(contourLandmarks) || contourLandmarks.length < 3) {
             return 1.0;
         }
 
@@ -498,7 +495,7 @@ export class DataProcessor {
      * @returns {number} 対称性（0-1、1が完全対称）
      */
     static calculateMouthSymmetry(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return 0;
         }
 
@@ -564,16 +561,12 @@ export class DataProcessor {
      * @returns {number} 上唇の高さ
      */
     static calculateUpperLipHeight(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return 0;
         }
 
-        const topOuterPoints = contourLandmarks
-            .filter(lm => [12, 13, 14, 15, 16, 17, 18].includes(lm.index))
-            .map(lm => lm.point || lm);
-        const topInnerPoints = contourLandmarks
-            .filter(lm => [78, 79, 80, 81, 82].includes(lm.index))
-            .map(lm => lm.point || lm);
+        const topOuterPoints = this._filterLandmarksByIndices(contourLandmarks, [12, 13, 14, 15, 16, 17, 18]);
+        const topInnerPoints = this._filterLandmarksByIndices(contourLandmarks, [78, 79, 80, 81, 82]);
 
         if (topOuterPoints.length === 0 || topInnerPoints.length === 0) return 0;
 
@@ -589,16 +582,12 @@ export class DataProcessor {
      * @returns {number} 下唇の高さ
      */
     static calculateLowerLipHeight(contourLandmarks) {
-        if (!contourLandmarks || contourLandmarks.length === 0) {
+        if (!this._validateContourLandmarks(contourLandmarks)) {
             return 0;
         }
 
-        const bottomOuterPoints = contourLandmarks
-            .filter(lm => [14, 15, 16, 17, 18].includes(lm.index))
-            .map(lm => lm.point || lm);
-        const bottomInnerPoints = contourLandmarks
-            .filter(lm => [308, 309, 310, 311, 312].includes(lm.index))
-            .map(lm => lm.point || lm);
+        const bottomOuterPoints = this._filterLandmarksByIndices(contourLandmarks, [14, 15, 16, 17, 18]);
+        const bottomInnerPoints = this._filterLandmarksByIndices(contourLandmarks, [308, 309, 310, 311, 312]);
 
         if (bottomOuterPoints.length === 0 || bottomInnerPoints.length === 0) return 0;
 
@@ -615,7 +604,7 @@ export class DataProcessor {
      * @returns {string} 'circular', 'elliptical', 'linear'
      */
     static calculateMouthOpeningShape(contourLandmarks, area = 0) {
-        if (!contourLandmarks || contourLandmarks.length < 3) {
+        if (!this._validateContourLandmarks(contourLandmarks) || contourLandmarks.length < 3) {
             return 'linear';
         }
 
@@ -670,9 +659,10 @@ export class DataProcessor {
      * ランドマークデータから全計測値を計算
      * @param {Object} mouthLandmarks - 口ランドマーク
      * @param {Array} contourLandmarks - 口の輪郭ランドマーク（オプション、より正確な計測に使用）
+     * @param {Array} allMouthLandmarksExtended - 拡張口ランドマーク配列（オプション、lipProtrusion計算用）
      * @returns {Object} 計測値
      */
-    static calculateAllMetrics(mouthLandmarks, contourLandmarks = null) {
+    static calculateAllMetrics(mouthLandmarks, contourLandmarks = null, allMouthLandmarksExtended = null) {
         let metrics;
 
         if (contourLandmarks && contourLandmarks.length > 0) {
@@ -698,6 +688,12 @@ export class DataProcessor {
             metrics.mouthCornerAngle = { left: 0, right: 0, average: 0 };
             metrics.lipCurvature = { upper: 0, lower: 0, average: 0 };
             metrics.circularity = 0;
+        }
+
+        if (allMouthLandmarksExtended && allMouthLandmarksExtended.length > 0) {
+            metrics.lipProtrusion = this.calculateLipProtrusion(allMouthLandmarksExtended);
+        } else {
+            metrics.lipProtrusion = 0;
         }
 
         return metrics;

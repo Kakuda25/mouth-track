@@ -7,6 +7,8 @@ import { FaceMeshHandler } from './FaceMeshHandler.js';
 import { DataProcessor } from './DataProcessor.js';
 import { Smoother } from '../utils/Smoother.js';
 import { TemporalFeatureExtractor } from './TemporalFeatureExtractor.js';
+import { CalibrationManager } from './CalibrationManager.js';
+import { ErrorHandler } from '../utils/ErrorHandler.js';
 
 export class MouthTracker {
     constructor(videoElement, onDataUpdate, options = {}) {
@@ -29,6 +31,10 @@ export class MouthTracker {
             lastTime: Date.now(),
             currentFps: 0
         };
+        this.calibrationManager = options.calibrationManager || new CalibrationManager({
+            duration: options.calibrationDuration || 3000,
+            sampleInterval: options.calibrationSampleInterval || 100
+        });
     }
 
     /**
@@ -46,7 +52,7 @@ export class MouthTracker {
 
 
         } catch (error) {
-            console.error('MouthTracker初期化エラー:', error);
+            ErrorHandler.handleError(error, 'MouthTracker初期化');
             throw error;
         }
     }
@@ -80,27 +86,18 @@ export class MouthTracker {
 
         this.lastNoFaceWarning = null;
 
-        const smoothedLandmarks = {};
-        Object.keys(mouthLandmarks).forEach(key => {
-            smoothedLandmarks[key] = this.smoother.smooth(key, mouthLandmarks[key]);
-        });
-
+        const smoothedLandmarks = this._smoothMouthLandmarksObject(mouthLandmarks);
         const smoothedAllMouthLandmarksExtended = this._smoothLandmarks(allMouthLandmarksExtended, 'all_extended_');
 
         let metrics;
         if (this.use34Points && contourLandmarks && contourLandmarks.length >= 34) {
             metrics = DataProcessor.calculateMetricsFromContour34(
                 smoothedLandmarks, 
-                contourLandmarks, 
+                contourLandmarks,
                 smoothedAllMouthLandmarksExtended
             );
         } else {
-            metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks);
-            if (smoothedAllMouthLandmarksExtended && smoothedAllMouthLandmarksExtended.length > 0) {
-                metrics.lipProtrusion = DataProcessor.calculateLipProtrusion(smoothedAllMouthLandmarksExtended);
-            } else {
-                metrics.lipProtrusion = 0;
-            }
+            metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks, smoothedAllMouthLandmarksExtended);
         }
 
         if (this.lastMetrics) {
@@ -162,6 +159,23 @@ export class MouthTracker {
     }
 
     /**
+     * 口ランドマークオブジェクトを平滑化
+     * @private
+     * @param {Object|null} mouthLandmarks - 口ランドマークオブジェクト
+     * @returns {Object|null} 平滑化された口ランドマークオブジェクト
+     */
+    _smoothMouthLandmarksObject(mouthLandmarks) {
+        if (!mouthLandmarks) {
+            return null;
+        }
+        const smoothedLandmarks = {};
+        Object.keys(mouthLandmarks).forEach(key => {
+            smoothedLandmarks[key] = this.smoother.smooth(key, mouthLandmarks[key]);
+        });
+        return smoothedLandmarks;
+    }
+
+    /**
      * FPSを更新
      */
     updateFPS() {
@@ -188,7 +202,7 @@ export class MouthTracker {
         }
 
         if (!this.videoElement) {
-            console.error('ビデオ要素が設定されていません');
+            ErrorHandler.handleError(new Error('ビデオ要素が設定されていません'), 'MouthTracker.start');
             return;
         }
 
@@ -219,7 +233,7 @@ export class MouthTracker {
                 await this.faceMeshHandler.send(this.videoElement);
             }
         } catch (error) {
-            console.error('トラッキングループエラー:', error);
+            ErrorHandler.handleError(error, 'MouthTracker.trackingLoop');
         }
 
         this.animationFrameId = requestAnimationFrame(() => {
@@ -259,6 +273,47 @@ export class MouthTracker {
      */
     getIsTracking() {
         return this.isTracking;
+    }
+
+    /**
+     * キャリブレーションを開始
+     * @returns {Promise<Object>} 基準値
+     */
+    async startCalibration() {
+        return this.calibrationManager.startCalibration(() => {
+            return this.lastMetrics;
+        });
+    }
+
+    /**
+     * キャリブレーションを停止
+     */
+    stopCalibration() {
+        this.calibrationManager.stopCalibration();
+    }
+
+    /**
+     * 基準値を取得
+     * @returns {Object|null} 基準値
+     */
+    getBaseline() {
+        return this.calibrationManager.getBaseline();
+    }
+
+    /**
+     * 基準値を設定
+     * @param {Object} baseline - 基準値
+     */
+    setBaseline(baseline) {
+        this.calibrationManager.setBaseline(baseline);
+    }
+
+    /**
+     * キャリブレーション中かどうか
+     * @returns {boolean} キャリブレーション中の場合true
+     */
+    getIsCalibrating() {
+        return this.calibrationManager.getIsCalibrating();
     }
 }
 

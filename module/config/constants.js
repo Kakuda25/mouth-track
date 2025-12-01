@@ -31,7 +31,7 @@ export const MOUTH_CONTOUR_INDICES = [
     61, 291
 ];
 
-// 拡張された口周辺のランドマーク（34点）
+// 口周辺のランドマーク（34点）
 export const MOUTH_CONTOUR_INDICES_34 = [
     12, 13, 14, 15, 16, 17, 18,
     78, 79, 80, 81, 82,
