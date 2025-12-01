@@ -139,20 +139,20 @@ export class Visualizer {
     }
 
     /**
-     * 口の領域を計算（32点から）
+     * 口の領域を計算（34点から）
      * @private
-     * @param {Array} contourLandmarks32 - 32点のランドマーク配列
+     * @param {Array} contourLandmarks34 - 34点のランドマーク配列
      * @returns {Object} 口の領域 {x, y, width, height}
      */
-    _calculateMouthRegionFrom32(contourLandmarks32) {
-        if (!contourLandmarks32 || contourLandmarks32.length === 0) {
+    _calculateMouthRegionFrom34(contourLandmarks34) {
+        if (!contourLandmarks34 || contourLandmarks34.length === 0) {
             return null;
         }
 
         const videoWidth = this.videoElement.videoWidth || this.canvas.width;
         const videoHeight = this.videoElement.videoHeight || this.canvas.height;
 
-        const canvasPoints = contourLandmarks32
+        const canvasPoints = contourLandmarks34
             .filter(item => item && item.point)
             .map(item => ({
                 x: item.point.x * videoWidth,
@@ -223,23 +223,23 @@ export class Visualizer {
     /**
      * 口領域を多角形として塗りつぶす
      * @private
-     * @param {Array} contourLandmarks32 - ランドマーク配列
+     * @param {Array} contourLandmarks34 - ランドマーク配列
      * @param {Function} toCanvas - 座標変換関数
      * @param {CanvasRenderingContext2D} ctx - Canvasコンテキスト
      */
-    _drawMouthPolygon(contourLandmarks32, toCanvas, ctx) {
-        if (!contourLandmarks32 || contourLandmarks32.length === 0) return;
+    _drawMouthPolygon(contourLandmarks34, toCanvas, ctx) {
+        if (!contourLandmarks34 || contourLandmarks34.length === 0) return;
 
         const upperLipOuter = [61, 12, 13, 14, 15, 16, 17, 18, 291];
         const lowerLipInner = [308, 309, 310, 311, 312];
 
         const outerPoints = upperLipOuter
-            .map(idx => this._findLandmarkByIndex(contourLandmarks32, idx))
+            .map(idx => this._findLandmarkByIndex(contourLandmarks34, idx))
             .filter(p => p && p.point)
             .map(p => toCanvas(p.point));
 
         const innerPoints = lowerLipInner
-            .map(idx => this._findLandmarkByIndex(contourLandmarks32, idx))
+            .map(idx => this._findLandmarkByIndex(contourLandmarks34, idx))
             .filter(p => p && p.point)
             .map(p => toCanvas(p.point))
             .reverse();
@@ -261,16 +261,16 @@ export class Visualizer {
     }
 
     /**
-     * 32点の接続線を描画（MediaPipe FaceMeshの正しい接続順序に従う）
+     * 34点の接続線を描画（MediaPipe FaceMeshの正しい接続順序に従う）
      * @private
-     * @param {Array} contourLandmarks32 - 32点のランドマーク配列
+     * @param {Array} contourLandmarks34 - 34点のランドマーク配列
      * @param {Function} toCanvas - 座標変換関数
      * @param {CanvasRenderingContext2D} ctx - Canvasコンテキスト
      */
-    _drawMouthConnections32(contourLandmarks32, toCanvas, ctx) {
+    _drawMouthConnections34(contourLandmarks34, toCanvas, ctx) {
         const upperLipOuter = [61, 12, 13, 14, 15, 16, 17, 18, 291];
-        const has84 = this._findLandmarkByIndex(contourLandmarks32, 84) !== null;
-        const has314 = this._findLandmarkByIndex(contourLandmarks32, 314) !== null;
+        const has84 = this._findLandmarkByIndex(contourLandmarks34, 84) !== null;
+        const has314 = this._findLandmarkByIndex(contourLandmarks34, 314) !== null;
         
         let lowerLipOuter;
         if (has84 && has314) {
@@ -282,34 +282,31 @@ export class Visualizer {
         const upperLipInner = [78, 79, 80, 81, 82];
         const lowerLipInner = [308, 309, 310, 311, 312];
 
-        this._drawPath(upperLipOuter, contourLandmarks32, toCanvas, ctx, '#ff0000', 3, false);
-        this._drawPath(lowerLipOuter, contourLandmarks32, toCanvas, ctx, '#ff8c00', 3, false);
-        this._drawPath(upperLipInner, contourLandmarks32, toCanvas, ctx, '#ff69b4', 2, false);
-        this._drawPath(lowerLipInner, contourLandmarks32, toCanvas, ctx, '#ff8c00', 2, false);
+        this._drawPath(upperLipOuter, contourLandmarks34, toCanvas, ctx, '#ff0000', 3, false);
+        this._drawPath(lowerLipOuter, contourLandmarks34, toCanvas, ctx, '#ff8c00', 3, false);
+        this._drawPath(upperLipInner, contourLandmarks34, toCanvas, ctx, '#ff69b4', 2, false);
+        this._drawPath(lowerLipInner, contourLandmarks34, toCanvas, ctx, '#ff8c00', 2, false);
 
-        // 口角周辺の接続（補助線）
         const leftCornerPath = [61, 39, 40, 41];
         const rightCornerPath = [291, 269, 270, 271];
-        this._drawPath(leftCornerPath, contourLandmarks32, toCanvas, ctx, '#adff2f', 1.5, false);
-        this._drawPath(rightCornerPath, contourLandmarks32, toCanvas, ctx, '#adff2f', 1.5, false);
+        this._drawPath(leftCornerPath, contourLandmarks34, toCanvas, ctx, '#adff2f', 1.5, false);
+        this._drawPath(rightCornerPath, contourLandmarks34, toCanvas, ctx, '#adff2f', 1.5, false);
 
-        // 頬の接続（補助線）
         const leftCheekPath = [116, 117];
         const rightCheekPath = [345, 346];
-        this._drawPath(leftCheekPath, contourLandmarks32, toCanvas, ctx, '#00ffff', 1.5, false);
-        this._drawPath(rightCheekPath, contourLandmarks32, toCanvas, ctx, '#00ffff', 1.5, false);
+        this._drawPath(leftCheekPath, contourLandmarks34, toCanvas, ctx, '#00ffff', 1.5, false);
+        this._drawPath(rightCheekPath, contourLandmarks34, toCanvas, ctx, '#00ffff', 1.5, false);
 
-        // 顎の接続（補助線）
         const jawPath = [172, 175, 176, 397];
-        this._drawPath(jawPath, contourLandmarks32, toCanvas, ctx, '#0000ff', 1.5, false);
+        this._drawPath(jawPath, contourLandmarks34, toCanvas, ctx, '#0000ff', 1.5, false);
     }
 
     /**
      * 34点のランドマークを描画
-     * @param {Array} contourLandmarks32 - 34点のランドマーク配列（変数名は後方互換性のため32）
+     * @param {Array} contourLandmarks34 - 34点のランドマーク配列
      */
-    drawLandmarks32(contourLandmarks32) {
-        if (!contourLandmarks32 || contourLandmarks32.length === 0) {
+    drawLandmarks34(contourLandmarks34) {
+        if (!contourLandmarks34 || contourLandmarks34.length === 0) {
             this.clear();
             return;
         }
@@ -328,8 +325,7 @@ export class Visualizer {
             return;
         }
 
-        // 口の領域を計算（34点から）
-        const mouthRegion = this._calculateMouthRegionFrom32(contourLandmarks32);
+        const mouthRegion = this._calculateMouthRegionFrom34(contourLandmarks34);
         if (!mouthRegion) {
             this.clear();
             return;
@@ -337,7 +333,7 @@ export class Visualizer {
 
         const toCanvas = this._createScaledToCanvas(mouthRegion, canvasWidth, canvasHeight, videoWidth, videoHeight);
 
-        contourLandmarks32.forEach((item) => {
+        contourLandmarks34.forEach((item) => {
             if (item && item.point) {
                 const pos = toCanvas(item.point);
                 ctx.beginPath();
@@ -370,8 +366,8 @@ export class Visualizer {
             }
         });
 
-        this._drawMouthPolygon(contourLandmarks32, toCanvas, ctx);
-        this._drawMouthConnections32(contourLandmarks32, toCanvas, ctx);
+        this._drawMouthPolygon(contourLandmarks34, toCanvas, ctx);
+        this._drawMouthConnections34(contourLandmarks34, toCanvas, ctx);
     }
 
     /**
@@ -398,7 +394,7 @@ export class Visualizer {
             return;
         }
 
-        const mouthRegion = this._calculateMouthRegionFrom32(allMouthLandmarks);
+        const mouthRegion = this._calculateMouthRegionFrom34(allMouthLandmarks);
         if (!mouthRegion) {
             this.clear();
             return;
@@ -589,12 +585,12 @@ export class Visualizer {
     /**
      * ランドマークを描画（34点対応）
      * @param {Object} mouthLandmarks - 口ランドマーク
-     * @param {Array} contourLandmarks32 - 34点のランドマーク（オプション、変数名は後方互換性のため32）
+     * @param {Array} contourLandmarks34 - 34点のランドマーク（オプション）
      * @param {Array} allMouthLandmarks - MOUTH_ALL_LANDMARKSのランドマーク（オプション）
      * @param {Array} allFaceLandmarks - 顔全体のランドマーク（オプション）
      */
-    drawLandmarks(mouthLandmarks, contourLandmarks32 = null, allMouthLandmarks = null, allFaceLandmarks = null) {
-        const drawMode = this._determineDrawMode(allFaceLandmarks, allMouthLandmarks, contourLandmarks32);
+    drawLandmarks(mouthLandmarks, contourLandmarks34 = null, allMouthLandmarks = null, allFaceLandmarks = null) {
+        const drawMode = this._determineDrawMode(allFaceLandmarks, allMouthLandmarks, contourLandmarks34);
         
         switch (drawMode) {
             case 'face':
@@ -603,8 +599,8 @@ export class Visualizer {
             case 'allMouth':
                 this.drawAllMouthLandmarks(allMouthLandmarks);
                 return;
-            case 'contour32':
-                this.drawLandmarks32(contourLandmarks32);
+            case 'contour34':
+                this.drawLandmarks34(contourLandmarks34);
                 return;
             case 'legacy':
             default:
@@ -618,18 +614,18 @@ export class Visualizer {
      * @private
      * @param {Array} allFaceLandmarks - 顔全体のランドマーク
      * @param {Array} allMouthLandmarks - MOUTH_ALL_LANDMARKSのランドマーク
-     * @param {Array} contourLandmarks32 - 34点のランドマーク
-     * @returns {string} 描画モード ('face' | 'allMouth' | 'contour32' | 'legacy')
+     * @param {Array} contourLandmarks34 - 34点のランドマーク
+     * @returns {string} 描画モード ('face' | 'allMouth' | 'contour34' | 'legacy')
      */
-    _determineDrawMode(allFaceLandmarks, allMouthLandmarks, contourLandmarks32) {
+    _determineDrawMode(allFaceLandmarks, allMouthLandmarks, contourLandmarks34) {
         if (allFaceLandmarks && allFaceLandmarks.length > 0) {
             return 'face';
         }
         if (allMouthLandmarks && allMouthLandmarks.length > 0) {
             return 'allMouth';
         }
-        if (contourLandmarks32 && contourLandmarks32.length >= 32) {
-            return 'contour32';
+        if (contourLandmarks34 && contourLandmarks34.length >= 34) {
+            return 'contour34';
         }
         return 'legacy';
     }

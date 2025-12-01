@@ -460,10 +460,10 @@ export class DataProcessor {
      * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列（34点）
      * @returns {Object} 計測値（拡張特徴量を含む）
      */
-    static calculateMetricsFromContour32(mouthLandmarks, contourLandmarks) {
+    static calculateMetricsFromContour34(mouthLandmarks, contourLandmarks) {
         const baseMetrics = this.calculateAllMetrics(mouthLandmarks, contourLandmarks);
 
-        if (contourLandmarks && contourLandmarks.length >= 32) {
+        if (contourLandmarks && contourLandmarks.length >= 34) {
             baseMetrics.cornerMovement = this.calculateCornerMovement(contourLandmarks);
             baseMetrics.cheekMovement = this.calculateCheekMovement(contourLandmarks);
             baseMetrics.jawMovement = this.calculateJawMovement(contourLandmarks);

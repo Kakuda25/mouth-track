@@ -5,6 +5,11 @@
 export class VowelClassifier {
     constructor(options = {}) {
         this.thresholds = {
+            // closed: parameters to detect mouth-closed state
+            closed: {
+                openness: 0.01,
+                lipThickness: 0.005
+            },
             vowels: {
                 'あ': {
                     openness: { min: 0.06, max: 0.15 },
@@ -60,6 +65,29 @@ export class VowelClassifier {
         const openness = metrics.openness;
         const width = metrics.width;
         const aspectRatio = metrics.aspectRatio;
+
+        // closed-mouth detection (prioritize)
+        const closedOpennessThreshold = this.thresholds.closed?.openness ?? 0.01;
+        const lipThickness = (metrics.upperLipThickness || 0) + (metrics.lowerLipThickness || 0);
+        const lipThicknessThreshold = this.thresholds.closed?.lipThickness ?? 0.005;
+        if (openness <= closedOpennessThreshold && lipThickness <= lipThicknessThreshold) {
+            const probs = this._getEmptyProbabilities();
+            probs['closed'] = 1;
+            const closedResult = {
+                vowel: 'closed',
+                confidence: 1,
+                probabilities: probs,
+                scores: { closed: 1 },
+                metrics: {
+                    openness: openness,
+                    width: width,
+                    aspectRatio: aspectRatio,
+                    area: metrics.area
+                }
+            };
+            if (this.onVowelDetected) this.onVowelDetected(closedResult);
+            return closedResult;
+        }
 
         const scores = this._calculateScoresRelative(openness, width, aspectRatio, metrics, temporalFeatures);
         const maxScore = Math.max(...Object.values(scores));
@@ -199,7 +227,8 @@ export class VowelClassifier {
             'い': 0,
             'う': 0,
             'え': 0,
-            'お': 0
+            'お': 0,
+            'closed': 0
         };
     }
 

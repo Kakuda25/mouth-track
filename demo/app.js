@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 scores: result.scores,
                                 vowel: result.vowel,
                                 confidence: result.confidence?.toFixed(2),
-                                landmarkCount: data.contourLandmarks32 ? data.contourLandmarks32.length : 0
+                                landmarkCount: data.contourLandmarks34 ? data.contourLandmarks34.length : 0
                             });
                         }
                     }
@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             overlayInfo.style.display = 'none';
                             // 顔全体のランドマークが利用可能な場合はそれを使用（既存の描画ロジックを使用しない）
                             // 次にMOUTH_ALL_LANDMARKS、次に34点版、最後に既存の描画
-                            visualizer.drawLandmarks(data.landmarks, data.contourLandmarks32, data.allMouthLandmarksExtended, data.allFaceLandmarks);
+                            visualizer.drawLandmarks(data.landmarks, data.contourLandmarks34, data.allMouthLandmarksExtended, data.allFaceLandmarks);
                         } else {
                             // 顔が検出されていない
                             overlayInfo.innerHTML = '<p>顔を検出できませんでした<br>カメラに向かって顔を映してください</p>';
@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                 }, {
-                    use32Points: true  // 32点版を有効化
+                    use34Points: true
                 });
 
                 await mouthTracker.initialize();

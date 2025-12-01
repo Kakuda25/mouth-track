@@ -3,7 +3,7 @@
  * FaceMeshの初期化と結果の処理を行います
  */
 
-import { FACE_MESH_CONFIG, MOUTH_CONTOUR_INDICES, MOUTH_CONTOUR_INDICES_32, MOUTH_ALL_LANDMARKS } from '../config/constants.js';
+import { FACE_MESH_CONFIG, MOUTH_CONTOUR_INDICES, MOUTH_CONTOUR_INDICES_34, MOUTH_ALL_LANDMARKS } from '../config/constants.js';
 import { structureMouthLandmarks } from '../utils/MouthLandmarks.js';
 
 // MediaPipe FaceMeshの動的インポート
@@ -147,21 +147,20 @@ export class FaceMeshHandler {
     }
 
     /**
-     * 口の輪郭ランドマークを取得（34点版、変数名は後方互換性のため32点版と記載）
+     * 口の輪郭ランドマークを取得（34点版）
      * より多くの点を使用することで、より正確な計測が可能
      * @param {Object} results - FaceMeshの結果
-     * @param {boolean} use32Points - 34点版を使用するか（デフォルト: true、変数名は後方互換性のため32Points）
+     * @param {boolean} use34Points - 34点版を使用するか（デフォルト: true）
      * @returns {Array|null} 口の輪郭ランドマーク配列（34点）
      */
-    getMouthContourLandmarks(results, use32Points = true) {
+    getMouthContourLandmarks(results, use34Points = true) {
         if (!results || !results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
             return null;
         }
 
         const landmarks = results.multiFaceLandmarks[0];
         
-        // 使用するインデックスを選択
-        const indices = use32Points ? MOUTH_CONTOUR_INDICES_32 : MOUTH_CONTOUR_INDICES;
+        const indices = use34Points ? MOUTH_CONTOUR_INDICES_34 : MOUTH_CONTOUR_INDICES;
 
         // ランドマークを取得（存在するもののみ）
         const contourLandmarks = indices

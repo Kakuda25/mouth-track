@@ -19,8 +19,7 @@ export class MouthTracker {
         this.temporalExtractor = options.temporalExtractor || new TemporalFeatureExtractor({
             bufferSize: options.temporalBufferSize || 30
         });
-        // 34点版を使用するか（デフォルト: true、変数名は後方互換性のためuse32Points）
-        this.use32Points = options.use32Points !== false;
+        this.use34Points = options.use34Points !== false;
         this.isTracking = false;
         this.animationFrameId = null;
         this.lastMetrics = null;
@@ -60,7 +59,7 @@ export class MouthTracker {
         const mouthLandmarks = this.faceMeshHandler.getMouthLandmarks(results);
         const allMouthLandmarksExtended = this.faceMeshHandler.getAllMouthLandmarksExtended(results);
         const allFaceLandmarks = this.faceMeshHandler.getAllFaceLandmarks(results);
-        const contourLandmarks = this.faceMeshHandler.getMouthContourLandmarks(results, this.use32Points);
+        const contourLandmarks = this.faceMeshHandler.getMouthContourLandmarks(results, this.use34Points);
         const confidence = this.faceMeshHandler.getConfidence(results);
 
         if (!mouthLandmarks) {
@@ -70,7 +69,7 @@ export class MouthTracker {
                 this.onDataUpdate({
                     landmarks: null,
                     metrics: null,
-                    contourLandmarks32: null,
+                    contourLandmarks34: null,
                     confidence: 0,
                     fps: this.fpsCounter.currentFps,
                     faceDetected: false
@@ -87,8 +86,8 @@ export class MouthTracker {
         });
 
         let metrics;
-        if (this.use32Points && contourLandmarks && contourLandmarks.length >= 32) {
-            metrics = DataProcessor.calculateMetricsFromContour32(smoothedLandmarks, contourLandmarks);
+        if (this.use34Points && contourLandmarks && contourLandmarks.length >= 34) {
+            metrics = DataProcessor.calculateMetricsFromContour34(smoothedLandmarks, contourLandmarks);
         } else {
             metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks);
         }
@@ -121,7 +120,7 @@ export class MouthTracker {
             allFaceLandmarks: smoothedAllFaceLandmarks,
             metrics: metrics,
             temporalFeatures: temporalFeatures,
-            contourLandmarks32: this.use32Points && contourLandmarks && contourLandmarks.length >= 32 ? contourLandmarks : null,
+            contourLandmarks34: this.use34Points && contourLandmarks && contourLandmarks.length >= 34 ? contourLandmarks : null,
             confidence: confidence,
             fps: this.fpsCounter.currentFps,
             timestamp: Date.now(),
