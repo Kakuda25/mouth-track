@@ -58,17 +58,12 @@ export class MouthTracker {
      */
     processResults(results) {
         const mouthLandmarks = this.faceMeshHandler.getMouthLandmarks(results);
-        // MOUTH_ALL_LANDMARKSを取得
         const allMouthLandmarksExtended = this.faceMeshHandler.getAllMouthLandmarksExtended(results);
-        // 顔全体のランドマークを取得（468個すべて）
         const allFaceLandmarks = this.faceMeshHandler.getAllFaceLandmarks(results);
-        // 34点版のランドマークを取得
         const contourLandmarks = this.faceMeshHandler.getMouthContourLandmarks(results, this.use32Points);
         const confidence = this.faceMeshHandler.getConfidence(results);
 
         if (!mouthLandmarks) {
-            // 顔が検出されていない
-            // 定期的に通知を送る（毎秒1回程度）
             const now = Date.now();
             if (!this.lastNoFaceWarning || now - this.lastNoFaceWarning > 2000) {
                 this.lastNoFaceWarning = now;
@@ -84,16 +79,13 @@ export class MouthTracker {
             return;
         }
 
-        // 顔が検出されている
         this.lastNoFaceWarning = null;
 
-        // 座標の平滑化
         const smoothedLandmarks = {};
         Object.keys(mouthLandmarks).forEach(key => {
             smoothedLandmarks[key] = this.smoother.smooth(key, mouthLandmarks[key]);
         });
 
-        // 計測値を計算（34点版の場合は拡張特徴量を含む）
         let metrics;
         if (this.use32Points && contourLandmarks && contourLandmarks.length >= 32) {
             metrics = DataProcessor.calculateMetricsFromContour32(smoothedLandmarks, contourLandmarks);
@@ -101,7 +93,6 @@ export class MouthTracker {
             metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks);
         }
 
-        // 変化率を計算
         if (this.lastMetrics) {
             metrics.opennessRate = DataProcessor.calculateChangeRate(
                 metrics.openness,
@@ -117,18 +108,13 @@ export class MouthTracker {
         }
         this.lastMetrics = metrics;
 
-        // 時間的特徴量を計算
         this.temporalExtractor.addFrame(metrics);
         const temporalFeatures = this.temporalExtractor.getAllTemporalFeatures();
-
-        // FPS計算
         this.updateFPS();
 
-        // 全ランドマークも平滑化（共通メソッドを使用）
         const smoothedAllMouthLandmarksExtended = this._smoothLandmarks(allMouthLandmarksExtended, 'all_extended_');
         const smoothedAllFaceLandmarks = this._smoothLandmarks(allFaceLandmarks, 'face_');
 
-        // データ更新コールバック
         this.onDataUpdate({
             landmarks: smoothedLandmarks,
             allMouthLandmarksExtended: smoothedAllMouthLandmarksExtended,
@@ -207,7 +193,6 @@ export class MouthTracker {
             currentFps: 0
         };
 
-        // トラッキングループを開始
         this.trackingLoop();
 
     }
@@ -228,7 +213,6 @@ export class MouthTracker {
             console.error('トラッキングループエラー:', error);
         }
 
-        // 次のフレームをリクエスト
         this.animationFrameId = requestAnimationFrame(() => {
             this.trackingLoop();
         });

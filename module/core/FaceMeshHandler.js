@@ -125,7 +125,6 @@ export class FaceMeshHandler {
             314   // 下唇外側右
         ];
 
-        // 重複を削除してソート
         const uniqueIndices = [...new Set(mouthIndices)].sort((a, b) => a - b);
 
         // ランドマークを取得（存在するもののみ）

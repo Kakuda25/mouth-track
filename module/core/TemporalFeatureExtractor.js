@@ -34,7 +34,6 @@ export class TemporalFeatureExtractor {
     // バッファに追加
     this.history.push(frameData);
 
-    // バッファサイズを超えた場合は古いデータを削除
     if (this.history.length > this.bufferSize) {
       this.history.shift();
     }

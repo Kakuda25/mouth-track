@@ -11,8 +11,6 @@ export class ErrorHandler {
      */
     static handleError(error, context = '') {
         console.error(`[Error${context ? ` in ${context}` : ''}]:`, error);
-        // エラーログはconsole.errorで記録
-        // UIへのエラー表示は呼び出し側で実装（demo/app.jsなど）
     }
 
     /**
