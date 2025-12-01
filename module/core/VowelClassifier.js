@@ -1,41 +1,14 @@
 /**
  * VowelClassifier - 母音判別クラス
  * 口の形状から日本語の5つの母音（あ、い、う、え、お）を判別します
+ * 拡張ランドマークと時間的特徴量を活用した高精度判定を実装
  */
 export class VowelClassifier {
     constructor(options = {}) {
         this.thresholds = {
-            // closed: parameters to detect mouth-closed state
             closed: {
                 openness: 0.01,
                 lipThickness: 0.005
-            },
-            vowels: {
-                'あ': {
-                    openness: { min: 0.06, max: 0.15 },
-                    width: { min: 0.05, max: 0.12 },
-                    aspectRatio: { min: 0.5, max: 0.8 }
-                },
-                'い': {
-                    openness: { min: 0.0, max: 0.03 },
-                    width: { min: 0.08, max: 0.15 },
-                    aspectRatio: { min: 2.0, max: 5.0 }
-                },
-                'う': {
-                    openness: { min: 0.0, max: 0.02 },
-                    width: { min: 0.03, max: 0.06 },
-                    aspectRatio: { min: 1.5, max: 3.0 }
-                },
-                'え': {
-                    openness: { min: 0.03, max: 0.05 },
-                    width: { min: 0.07, max: 0.12 },
-                    aspectRatio: { min: 1.5, max: 2.5 }
-                },
-                'お': {
-                    openness: { min: 0.05, max: 0.08 },
-                    width: { min: 0.05, max: 0.10 },
-                    aspectRatio: { min: 0.9, max: 1.5 }
-                }
             }
         };
 
@@ -48,9 +21,9 @@ export class VowelClassifier {
 
     /**
      * 計測値から母音を判別
-     * @param {Object} metrics - 計測値 {openness, width, area, aspectRatio, ...}
-     * @param {Object} temporalFeatures - 時間的特徴量（オプション、現在は未使用。将来の改善で使用予定）
-     * @returns {Object} 判別結果 {vowel, confidence, probabilities}
+     * @param {Object} metrics - 計測値
+     * @param {Object} temporalFeatures - 時間的特徴量
+     * @returns {Object} 判別結果 {vowel, confidence, probabilities, scores, metrics}
      */
     classify(metrics, temporalFeatures = null) {
         if (!metrics || !metrics.openness || !metrics.width || !metrics.aspectRatio) {
@@ -58,6 +31,7 @@ export class VowelClassifier {
                 vowel: null,
                 confidence: 0,
                 probabilities: this._getEmptyProbabilities(),
+                scores: {},
                 metrics: null
             };
         }
@@ -65,31 +39,23 @@ export class VowelClassifier {
         const openness = metrics.openness;
         const width = metrics.width;
         const aspectRatio = metrics.aspectRatio;
-
-        // closed-mouth detection (prioritize)
-        const closedOpennessThreshold = this.thresholds.closed?.openness ?? 0.01;
         const lipThickness = (metrics.upperLipThickness || 0) + (metrics.lowerLipThickness || 0);
+
+        const closedOpennessThreshold = this.thresholds.closed?.openness ?? 0.01;
         const lipThicknessThreshold = this.thresholds.closed?.lipThickness ?? 0.005;
         if (openness <= closedOpennessThreshold && lipThickness <= lipThicknessThreshold) {
             const probs = this._getEmptyProbabilities();
             probs['closed'] = 1;
-            const closedResult = {
+            return {
                 vowel: 'closed',
                 confidence: 1,
                 probabilities: probs,
                 scores: { closed: 1 },
-                metrics: {
-                    openness: openness,
-                    width: width,
-                    aspectRatio: aspectRatio,
-                    area: metrics.area
-                }
+                metrics: this._extractMetrics(metrics)
             };
-            if (this.onVowelDetected) this.onVowelDetected(closedResult);
-            return closedResult;
         }
 
-        const scores = this._calculateScoresRelative(openness, width, aspectRatio, metrics, temporalFeatures);
+        const scores = this._calculateScoresExtended(metrics, temporalFeatures);
         const maxScore = Math.max(...Object.values(scores));
         const vowel = Object.keys(scores).find(key => scores[key] === maxScore);
         const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
@@ -97,16 +63,11 @@ export class VowelClassifier {
         const probabilities = this._calculateProbabilities(scores, totalScore);
 
         const result = {
-            vowel: confidence > 0.3 ? vowel : null, // 信頼度が低い場合はnull
+            vowel: confidence > 0.25 ? vowel : null,
             confidence: confidence,
             probabilities: probabilities,
             scores: scores,
-            metrics: {
-                openness: openness,
-                width: width,
-                aspectRatio: aspectRatio,
-                area: metrics.area
-            }
+            metrics: this._extractMetrics(metrics)
         };
 
         if (this.onVowelDetected) {
@@ -117,86 +78,168 @@ export class VowelClassifier {
     }
 
     /**
-     * 各母音のスコアを計算
+     * 拡張特徴量を活用したスコア計算
      * @private
-     * @param {number} openness - 開き具合
-     * @param {number} width - 幅
-     * @param {number} aspectRatio - アスペクト比
-     * @param {Object} metrics - 計測値（将来の改善で使用予定）
-     * @param {Object} temporalFeatures - 時間的特徴量（将来の改善で使用予定）
+     * @param {Object} metrics - 計測値
+     * @param {Object} temporalFeatures - 時間的特徴量
+     * @returns {Object} 各母音のスコア
      */
-    _calculateScoresRelative(openness, width, aspectRatio, metrics = null, temporalFeatures = null) {
-        const scores = {};
-
-        scores['あ'] = this._scoreForA(openness, aspectRatio);
-        scores['い'] = this._scoreForI(openness, width, aspectRatio);
-        scores['う'] = this._scoreForU(openness, width, aspectRatio);
-        scores['え'] = this._scoreForE(openness, width, aspectRatio);
-        scores['お'] = this._scoreForO(openness, width, aspectRatio);
-
-        return scores;
+    _calculateScoresExtended(metrics, temporalFeatures) {
+        return {
+            'あ': this._scoreForA(metrics, temporalFeatures),
+            'い': this._scoreForI(metrics, temporalFeatures),
+            'う': this._scoreForU(metrics, temporalFeatures),
+            'え': this._scoreForE(metrics, temporalFeatures),
+            'お': this._scoreForO(metrics, temporalFeatures)
+        };
     }
 
     /**
      * 「あ」のスコアを計算
      * @private
      */
-    _scoreForA(openness, aspectRatio) {
-        const opennessScore = Math.min(openness / 0.06, 1.0);
-        const aspectScore = aspectRatio < 0.8 ? 1.0 : Math.max(0, 1.0 - (aspectRatio - 0.8) * 2);
-        return (opennessScore * 0.6) + (aspectScore * 0.4);
+    _scoreForA(metrics, temporalFeatures) {
+        const { openness, aspectRatio, circularity, area, lipCurvature } = metrics;
+
+        const opennessScore = this._normalizeScore(openness, 0.06, 0.15, true);
+        const aspectScore = this._normalizeScore(aspectRatio, 0.5, 0.8, false);
+        const circularityScore = circularity || 0;
+        const areaScore = this._normalizeScore(area || 0, 0.005, 0.02, true);
+        const curvatureScore = lipCurvature ? 1.0 - Math.min((lipCurvature.upper || 0) / 0.01, 1.0) : 0.5;
+
+        const baseScore = (opennessScore * 0.5) + (aspectScore * 0.3) + (circularityScore * 0.2);
+        const extendedScore = (areaScore * 0.4) + (curvatureScore * 0.3) + (circularityScore * 0.3);
+
+        let temporalScore = 0.5;
+        if (temporalFeatures?.openness) {
+            const velocity = Math.abs(temporalFeatures.openness.velocity || 0);
+            const trend = temporalFeatures.openness.trend === 'increasing' ? 1.0 : 0.5;
+            temporalScore = (Math.min(velocity / 0.1, 1.0) * 0.6) + (trend * 0.4);
+        }
+
+        return (baseScore * 0.6) + (extendedScore * 0.25) + (temporalScore * 0.15);
     }
 
     /**
      * 「い」のスコアを計算
      * @private
      */
-    _scoreForI(openness, width, aspectRatio) {
-        const opennessScore = openness < 0.03 ? 1.0 : Math.max(0, 1.0 - (openness - 0.03) * 20);
-        const widthScore = Math.min(width / 0.08, 1.0);
-        const aspectScore = aspectRatio > 2.0 ? Math.min((aspectRatio - 2.0) / 2.0, 1.0) : Math.max(0, aspectRatio / 2.0);
-        return (opennessScore * 0.3) + (widthScore * 0.4) + (aspectScore * 0.3);
+    _scoreForI(metrics, temporalFeatures) {
+        const { openness, width, aspectRatio, mouthCornerAngle, cornerMovement, cheekMovement, lipCurvature } = metrics;
+
+        const opennessScore = this._normalizeScore(openness, 0.0, 0.03, false);
+        const widthScore = this._normalizeScore(width, 0.08, 0.15, true);
+        const aspectScore = this._normalizeScore(aspectRatio, 2.0, 5.0, true);
+        const cornerAngleScore = mouthCornerAngle ? Math.max(0, (mouthCornerAngle.average || 0) / 0.5) : 0;
+        const cornerMovementScore = cornerMovement ? Math.min((cornerMovement.average || 0) / 0.02, 1.0) : 0;
+        const cheekMovementScore = cheekMovement ? Math.min((cheekMovement.average || 0) / 0.03, 1.0) : 0;
+        const curvatureScore = lipCurvature ? 1.0 - Math.min((lipCurvature.upper || 0) / 0.005, 1.0) : 0.5;
+
+        const baseScore = (opennessScore * 0.3) + (widthScore * 0.4) + (aspectScore * 0.3);
+        const extendedScore = (cornerAngleScore * 0.3) + (cornerMovementScore * 0.25) + 
+                              (cheekMovementScore * 0.25) + (curvatureScore * 0.2);
+
+        return (baseScore * 0.65) + (extendedScore * 0.35);
     }
 
     /**
      * 「う」のスコアを計算
      * @private
      */
-    _scoreForU(openness, width, aspectRatio) {
-        const opennessScore = openness < 0.02 ? 1.0 : Math.max(0, 1.0 - (openness - 0.02) * 30);
-        const widthScore = width < 0.06 ? 1.0 : Math.max(0, 1.0 - (width - 0.06) * 15);
-        const aspectScore = aspectRatio >= 1.5 && aspectRatio <= 3.0
-            ? 1.0
-            : Math.max(0, 1.0 - Math.min(Math.abs(aspectRatio - 2.25) / 1.5, 1.0));
-        return (opennessScore * 0.4) + (widthScore * 0.4) + (aspectScore * 0.2);
+    _scoreForU(metrics, temporalFeatures) {
+        const { openness, width, aspectRatio, upperLipThickness, lowerLipThickness, 
+                circularity, lipCurvature, jawMovement, lipProtrusion } = metrics;
+
+        const opennessScore = this._normalizeScore(openness, 0.0, 0.02, false);
+        const widthScore = this._normalizeScore(width, 0.03, 0.06, false);
+        const aspectScore = this._normalizeScore(aspectRatio, 1.5, 3.0, false);
+        const lipThicknessScore = this._normalizeScore(
+            (upperLipThickness || 0) + (lowerLipThickness || 0), 0.005, 0.015, true
+        );
+        const circularityScore = circularity || 0;
+        const curvatureScore = lipCurvature ? Math.min((lipCurvature.average || 0) / 0.01, 1.0) : 0;
+        const jawMovementScore = jawMovement ? Math.min((jawMovement || 0) / 0.05, 1.0) : 0;
+        const protrusionScore = lipProtrusion ? Math.min((lipProtrusion || 0) / 0.01, 1.0) : 0;
+
+        const baseScore = (opennessScore * 0.4) + (widthScore * 0.4) + (aspectScore * 0.2);
+        const extendedScore = (lipThicknessScore * 0.25) + (circularityScore * 0.2) + 
+                              (curvatureScore * 0.2) + (jawMovementScore * 0.15) + (protrusionScore * 0.2);
+
+        return (baseScore * 0.6) + (extendedScore * 0.4);
     }
 
     /**
      * 「え」のスコアを計算
      * @private
      */
-    _scoreForE(openness, width, aspectRatio) {
-        const opennessScore = openness >= 0.03 && openness <= 0.05
-            ? 1.0
-            : Math.max(0, 1.0 - Math.abs(openness - 0.04) * 25);
-        const widthScore = Math.min(width / 0.07, 1.0);
-        const aspectScore = aspectRatio > 1.5 ? Math.min((aspectRatio - 1.5) / 1.0, 1.0) : Math.max(0, aspectRatio / 1.5);
-        return (opennessScore * 0.3) + (widthScore * 0.4) + (aspectScore * 0.3);
+    _scoreForE(metrics, temporalFeatures) {
+        const { openness, width, aspectRatio, mouthCornerAngle, lipCurvature } = metrics;
+
+        const opennessScore = this._normalizeScore(openness, 0.03, 0.05, false);
+        const widthScore = this._normalizeScore(width, 0.07, 0.12, true);
+        const aspectScore = this._normalizeScore(aspectRatio, 1.5, 2.5, true);
+        const cornerAngleScore = mouthCornerAngle ? Math.max(0, (mouthCornerAngle.average || 0) / 0.3) : 0;
+        const curvatureScore = lipCurvature ? Math.min((lipCurvature.upper || 0) / 0.008, 1.0) : 0.5;
+
+        const baseScore = (opennessScore * 0.3) + (widthScore * 0.4) + (aspectScore * 0.3);
+        const extendedScore = (cornerAngleScore * 0.5) + (curvatureScore * 0.5);
+
+        let temporalScore = 0.5;
+        if (temporalFeatures?.['aspectRatio']) {
+            const trend = temporalFeatures['aspectRatio'].trend === 'increasing' ? 1.0 : 0.5;
+            temporalScore = trend;
+        }
+
+        return (baseScore * 0.7) + (extendedScore * 0.2) + (temporalScore * 0.1);
     }
 
     /**
      * 「お」のスコアを計算
      * @private
      */
-    _scoreForO(openness, width, aspectRatio) {
-        const opennessScore = openness >= 0.05 && openness <= 0.08
-            ? 1.0
-            : Math.max(0, 1.0 - Math.abs(openness - 0.065) * 20);
-        const widthScore = width >= 0.05 && width <= 0.10
-            ? 1.0
-            : Math.max(0, 1.0 - Math.abs(width - 0.075) * 15);
-        const aspectScore = aspectRatio < 1.5 ? 1.0 : Math.max(0, 1.0 - (aspectRatio - 1.5) * 1.0);
-        return (opennessScore * 0.4) + (widthScore * 0.3) + (aspectScore * 0.3);
+    _scoreForO(metrics, temporalFeatures) {
+        const { openness, width, aspectRatio, circularity, lipCurvature, 
+                upperLipThickness, lowerLipThickness, jawMovement, lipProtrusion } = metrics;
+
+        const opennessScore = this._normalizeScore(openness, 0.05, 0.08, false);
+        const widthScore = this._normalizeScore(width, 0.05, 0.10, false);
+        const aspectScore = this._normalizeScore(aspectRatio, 0.9, 1.5, false);
+        const circularityScore = circularity || 0;
+        const curvatureScore = lipCurvature ? Math.min((lipCurvature.average || 0) / 0.01, 1.0) : 0;
+        const lipThicknessScore = this._normalizeScore(
+            (upperLipThickness || 0) + (lowerLipThickness || 0), 0.005, 0.015, true
+        );
+        const jawMovementScore = jawMovement ? Math.min((jawMovement || 0) / 0.05, 1.0) : 0;
+        const protrusionScore = lipProtrusion ? Math.min((lipProtrusion || 0) / 0.01, 1.0) : 0;
+
+        const baseScore = (opennessScore * 0.4) + (widthScore * 0.3) + (aspectScore * 0.3);
+        const extendedScore = (circularityScore * 0.25) + (curvatureScore * 0.25) + 
+                              (lipThicknessScore * 0.2) + (jawMovementScore * 0.15) + (protrusionScore * 0.15);
+
+        return (baseScore * 0.6) + (extendedScore * 0.4);
+    }
+
+    /**
+     * 特徴量を正規化してスコアを計算
+     * @private
+     * @param {number} value - 特徴量の値
+     * @param {number} min - 最小値
+     * @param {number} max - 最大値
+     * @param {boolean} higherIsBetter - 値が大きいほど良いか
+     * @returns {number} 正規化されたスコア（0-1）
+     */
+    _normalizeScore(value, min, max, higherIsBetter) {
+        if (max === min) return 0.5;
+        
+        if (higherIsBetter) {
+            if (value >= max) return 1.0;
+            if (value <= min) return 0.0;
+            return (value - min) / (max - min);
+        } else {
+            if (value <= min) return 1.0;
+            if (value >= max) return 0.0;
+            return 1.0 - ((value - min) / (max - min));
+        }
     }
 
     /**
@@ -233,6 +276,22 @@ export class VowelClassifier {
     }
 
     /**
+     * 計測値から主要な値を抽出
+     * @private
+     */
+    _extractMetrics(metrics) {
+        return {
+            openness: metrics.openness,
+            width: metrics.width,
+            aspectRatio: metrics.aspectRatio,
+            area: metrics.area,
+            circularity: metrics.circularity,
+            lipCurvature: metrics.lipCurvature,
+            mouthCornerAngle: metrics.mouthCornerAngle
+        };
+    }
+
+    /**
      * 閾値を設定
      * @param {Object} thresholds - 閾値設定
      */
@@ -240,4 +299,3 @@ export class VowelClassifier {
         this.thresholds = { ...this.thresholds, ...thresholds };
     }
 }
-

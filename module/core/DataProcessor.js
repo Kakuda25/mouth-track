@@ -455,22 +455,212 @@ export class DataProcessor {
     }
 
     /**
+     * 口の楕円度を計算
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {number} 楕円度（長軸/短軸比）
+     */
+    static calculateMouthEllipticity(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length < 3) {
+            return 1.0;
+        }
+
+        const points = contourLandmarks.map(lm => lm.point || lm);
+        const center = this.calculateAveragePoint(points);
+        if (!center) return 1.0;
+
+        let maxDist = 0;
+        let minDist = Infinity;
+        let maxDir = { x: 0, y: 0 };
+        let minDir = { x: 0, y: 0 };
+
+        for (let i = 0; i < points.length; i++) {
+            const dx = points[i].x - center.x;
+            const dy = points[i].y - center.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > maxDist) {
+                maxDist = dist;
+                maxDir = { x: dx / dist, y: dy / dist };
+            }
+            if (dist < minDist && dist > 0) {
+                minDist = dist;
+                minDir = { x: dx / dist, y: dy / dist };
+            }
+        }
+
+        if (minDist === 0 || maxDist === 0) return 1.0;
+        return maxDist / minDist;
+    }
+
+    /**
+     * 口の左右対称性を計算
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {number} 対称性（0-1、1が完全対称）
+     */
+    static calculateMouthSymmetry(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return 0;
+        }
+
+        const leftCorner = contourLandmarks.find(lm => lm.index === 61);
+        const rightCorner = contourLandmarks.find(lm => lm.index === 291);
+        if (!leftCorner || !rightCorner) return 0;
+
+        const centerX = (leftCorner.point.x + rightCorner.point.x) / 2;
+        const centerY = (leftCorner.point.y + rightCorner.point.y) / 2;
+
+        const leftPoints = contourLandmarks.filter(lm => (lm.point || lm).x < centerX);
+        const rightPoints = contourLandmarks.filter(lm => (lm.point || lm).x > centerX);
+
+        if (leftPoints.length === 0 || rightPoints.length === 0) return 0;
+
+        let totalDiff = 0;
+        let count = 0;
+
+        for (const leftPoint of leftPoints) {
+            const lp = leftPoint.point || leftPoint;
+            const mirrorX = 2 * centerX - lp.x;
+            const mirrorY = lp.y;
+
+            let minDist = Infinity;
+            for (const rightPoint of rightPoints) {
+                const rp = rightPoint.point || rightPoint;
+                const dist = Math.sqrt(
+                    Math.pow(rp.x - mirrorX, 2) + Math.pow(rp.y - mirrorY, 2)
+                );
+                minDist = Math.min(minDist, dist);
+            }
+
+            totalDiff += minDist;
+            count++;
+        }
+
+        return count > 0 ? Math.max(0, 1.0 - (totalDiff / count) * 10) : 0;
+    }
+
+    /**
+     * 唇の突出度を計算（Z軸方向）
+     * @param {Array} allMouthLandmarksExtended - 拡張口ランドマーク配列
+     * @returns {number} 突出度
+     */
+    static calculateLipProtrusion(allMouthLandmarksExtended) {
+        if (!allMouthLandmarksExtended || allMouthLandmarksExtended.length === 0) {
+            return 0;
+        }
+
+        const outerPoints = allMouthLandmarksExtended
+            .filter(lm => [12, 13, 14, 15, 16, 17, 18].includes(lm.index))
+            .map(lm => lm.point || lm);
+
+        if (outerPoints.length === 0) return 0;
+
+        const avgZ = outerPoints.reduce((sum, p) => sum + (p.z || 0), 0) / outerPoints.length;
+        return Math.max(0, avgZ);
+    }
+
+    /**
+     * 上唇の高さを計算
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {number} 上唇の高さ
+     */
+    static calculateUpperLipHeight(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return 0;
+        }
+
+        const topOuterPoints = contourLandmarks
+            .filter(lm => [12, 13, 14, 15, 16, 17, 18].includes(lm.index))
+            .map(lm => lm.point || lm);
+        const topInnerPoints = contourLandmarks
+            .filter(lm => [78, 79, 80, 81, 82].includes(lm.index))
+            .map(lm => lm.point || lm);
+
+        if (topOuterPoints.length === 0 || topInnerPoints.length === 0) return 0;
+
+        const outerAvgY = topOuterPoints.reduce((sum, p) => sum + p.y, 0) / topOuterPoints.length;
+        const innerAvgY = topInnerPoints.reduce((sum, p) => sum + p.y, 0) / topInnerPoints.length;
+
+        return Math.abs(outerAvgY - innerAvgY);
+    }
+
+    /**
+     * 下唇の高さを計算
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {number} 下唇の高さ
+     */
+    static calculateLowerLipHeight(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return 0;
+        }
+
+        const bottomOuterPoints = contourLandmarks
+            .filter(lm => [14, 15, 16, 17, 18].includes(lm.index))
+            .map(lm => lm.point || lm);
+        const bottomInnerPoints = contourLandmarks
+            .filter(lm => [308, 309, 310, 311, 312].includes(lm.index))
+            .map(lm => lm.point || lm);
+
+        if (bottomOuterPoints.length === 0 || bottomInnerPoints.length === 0) return 0;
+
+        const outerAvgY = bottomOuterPoints.reduce((sum, p) => sum + p.y, 0) / bottomOuterPoints.length;
+        const innerAvgY = bottomInnerPoints.reduce((sum, p) => sum + p.y, 0) / bottomInnerPoints.length;
+
+        return Math.abs(outerAvgY - innerAvgY);
+    }
+
+    /**
+     * 口の開き方の形状を計算
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @param {number} area - 口の面積
+     * @returns {string} 'circular', 'elliptical', 'linear'
+     */
+    static calculateMouthOpeningShape(contourLandmarks, area = 0) {
+        if (!contourLandmarks || contourLandmarks.length < 3) {
+            return 'linear';
+        }
+
+        const circularity = area > 0 ? this.calculateCircularity(area, contourLandmarks) : 0;
+        const ellipticity = this.calculateMouthEllipticity(contourLandmarks);
+
+        if (circularity > 0.7) return 'circular';
+        if (ellipticity > 1.5) return 'elliptical';
+        return 'linear';
+    }
+
+    /**
      * 34点版の計測値を計算
      * @param {Object} mouthLandmarks - 口ランドマーク
      * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列（34点）
+     * @param {Array} allMouthLandmarksExtended - 拡張口ランドマーク配列
      * @returns {Object} 計測値（拡張特徴量を含む）
      */
-    static calculateMetricsFromContour34(mouthLandmarks, contourLandmarks) {
+    static calculateMetricsFromContour34(mouthLandmarks, contourLandmarks, allMouthLandmarksExtended = null) {
         const baseMetrics = this.calculateAllMetrics(mouthLandmarks, contourLandmarks);
 
         if (contourLandmarks && contourLandmarks.length >= 34) {
             baseMetrics.cornerMovement = this.calculateCornerMovement(contourLandmarks);
             baseMetrics.cheekMovement = this.calculateCheekMovement(contourLandmarks);
             baseMetrics.jawMovement = this.calculateJawMovement(contourLandmarks);
+            baseMetrics.ellipticity = this.calculateMouthEllipticity(contourLandmarks);
+            baseMetrics.symmetry = this.calculateMouthSymmetry(contourLandmarks);
+            baseMetrics.upperLipHeight = this.calculateUpperLipHeight(contourLandmarks);
+            baseMetrics.lowerLipHeight = this.calculateLowerLipHeight(contourLandmarks);
+            baseMetrics.openingShape = this.calculateMouthOpeningShape(contourLandmarks, baseMetrics.area);
         } else {
             baseMetrics.cornerMovement = { left: 0, right: 0, average: 0 };
             baseMetrics.cheekMovement = { left: 0, right: 0, average: 0 };
             baseMetrics.jawMovement = 0;
+            baseMetrics.ellipticity = 1.0;
+            baseMetrics.symmetry = 0;
+            baseMetrics.upperLipHeight = 0;
+            baseMetrics.lowerLipHeight = 0;
+            baseMetrics.openingShape = 'linear';
+        }
+
+        if (allMouthLandmarksExtended && allMouthLandmarksExtended.length > 0) {
+            baseMetrics.lipProtrusion = this.calculateLipProtrusion(allMouthLandmarksExtended);
+        } else {
+            baseMetrics.lipProtrusion = 0;
         }
 
         return baseMetrics;

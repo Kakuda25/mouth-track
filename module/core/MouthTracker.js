@@ -85,11 +85,22 @@ export class MouthTracker {
             smoothedLandmarks[key] = this.smoother.smooth(key, mouthLandmarks[key]);
         });
 
+        const smoothedAllMouthLandmarksExtended = this._smoothLandmarks(allMouthLandmarksExtended, 'all_extended_');
+
         let metrics;
         if (this.use34Points && contourLandmarks && contourLandmarks.length >= 34) {
-            metrics = DataProcessor.calculateMetricsFromContour34(smoothedLandmarks, contourLandmarks);
+            metrics = DataProcessor.calculateMetricsFromContour34(
+                smoothedLandmarks, 
+                contourLandmarks, 
+                smoothedAllMouthLandmarksExtended
+            );
         } else {
             metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks);
+            if (smoothedAllMouthLandmarksExtended && smoothedAllMouthLandmarksExtended.length > 0) {
+                metrics.lipProtrusion = DataProcessor.calculateLipProtrusion(smoothedAllMouthLandmarksExtended);
+            } else {
+                metrics.lipProtrusion = 0;
+            }
         }
 
         if (this.lastMetrics) {
@@ -111,7 +122,6 @@ export class MouthTracker {
         const temporalFeatures = this.temporalExtractor.getAllTemporalFeatures();
         this.updateFPS();
 
-        const smoothedAllMouthLandmarksExtended = this._smoothLandmarks(allMouthLandmarksExtended, 'all_extended_');
         const smoothedAllFaceLandmarks = this._smoothLandmarks(allFaceLandmarks, 'face_');
 
         this.onDataUpdate({

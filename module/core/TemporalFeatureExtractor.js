@@ -218,14 +218,30 @@ export class TemporalFeatureExtractor {
     }
 
     const features = {};
-    const featureNames = ['openness', 'width', 'aspectRatio', 'area'];
+    const baseFeatureNames = ['openness', 'width', 'aspectRatio', 'area'];
 
-    for (const featureName of featureNames) {
+    for (const featureName of baseFeatureNames) {
       features[featureName] = {
         velocity: this.getVelocity(featureName),
         acceleration: this.getAcceleration(featureName),
         movingAverage: this.getMovingAverage(featureName),
         standardDeviation: this.getStandardDeviation(featureName),
+        trend: this.getTrend(featureName)
+      };
+    }
+
+    const extendedFeatureNames = [
+      'mouthCornerAngle.average',
+      'lipCurvature.average',
+      'circularity',
+      'upperLipThickness',
+      'lowerLipThickness'
+    ];
+
+    for (const featureName of extendedFeatureNames) {
+      features[featureName] = {
+        velocity: this.getVelocity(featureName),
+        acceleration: this.getAcceleration(featureName),
         trend: this.getTrend(featureName)
       };
     }
