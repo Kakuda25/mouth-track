@@ -19,6 +19,8 @@ export class MouthTracker {
         this.temporalExtractor = options.temporalExtractor || new TemporalFeatureExtractor({
             bufferSize: options.temporalBufferSize || 30
         });
+        // 34点版を使用するか（デフォルト: true、変数名は後方互換性のためuse32Points）
+        this.use32Points = options.use32Points !== false;
         this.isTracking = false;
         this.animationFrameId = null;
         this.lastMetrics = null;
@@ -56,8 +58,12 @@ export class MouthTracker {
      */
     processResults(results) {
         const mouthLandmarks = this.faceMeshHandler.getMouthLandmarks(results);
-        const allMouthLandmarks = this.faceMeshHandler.getAllMouthLandmarks(results);
-        const contourLandmarks = this.faceMeshHandler.getMouthContourLandmarks(results);
+        // MOUTH_ALL_LANDMARKSを取得
+        const allMouthLandmarksExtended = this.faceMeshHandler.getAllMouthLandmarksExtended(results);
+        // 顔全体のランドマークを取得（468個すべて）
+        const allFaceLandmarks = this.faceMeshHandler.getAllFaceLandmarks(results);
+        // 34点版のランドマークを取得
+        const contourLandmarks = this.faceMeshHandler.getMouthContourLandmarks(results, this.use32Points);
         const confidence = this.faceMeshHandler.getConfidence(results);
 
         if (!mouthLandmarks) {
@@ -68,8 +74,8 @@ export class MouthTracker {
                 this.lastNoFaceWarning = now;
                 this.onDataUpdate({
                     landmarks: null,
-                    allLandmarks: null,
                     metrics: null,
+                    contourLandmarks32: null,
                     confidence: 0,
                     fps: this.fpsCounter.currentFps,
                     faceDetected: false
@@ -87,8 +93,13 @@ export class MouthTracker {
             smoothedLandmarks[key] = this.smoother.smooth(key, mouthLandmarks[key]);
         });
 
-        // 計測値を計算（MOUTH_CONTOUR_INDICESを使用してより正確に）
-        const metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks);
+        // 計測値を計算（34点版の場合は拡張特徴量を含む）
+        let metrics;
+        if (this.use32Points && contourLandmarks && contourLandmarks.length >= 32) {
+            metrics = DataProcessor.calculateMetricsFromContour32(smoothedLandmarks, contourLandmarks);
+        } else {
+            metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks);
+        }
 
         // 変化率を計算
         if (this.lastMetrics) {
@@ -113,31 +124,45 @@ export class MouthTracker {
         // FPS計算
         this.updateFPS();
 
-        // 全ランドマークも平滑化（オプション）
-        let smoothedAllLandmarks = null;
-        if (allMouthLandmarks && allMouthLandmarks.length > 0) {
-            smoothedAllLandmarks = allMouthLandmarks.map(item => {
-                const smoothedPoint = this.smoother.smooth(`all_${item.index}`, item.point);
-                return {
-                    ...item,
-                    point: smoothedPoint,
-                    x: smoothedPoint.x,
-                    y: smoothedPoint.y,
-                    z: smoothedPoint.z || 0
-                };
-            });
-        }
+        // 全ランドマークも平滑化（共通メソッドを使用）
+        const smoothedAllMouthLandmarksExtended = this._smoothLandmarks(allMouthLandmarksExtended, 'all_extended_');
+        const smoothedAllFaceLandmarks = this._smoothLandmarks(allFaceLandmarks, 'face_');
 
         // データ更新コールバック
         this.onDataUpdate({
             landmarks: smoothedLandmarks,
-            allLandmarks: smoothedAllLandmarks,
+            allMouthLandmarksExtended: smoothedAllMouthLandmarksExtended,
+            allFaceLandmarks: smoothedAllFaceLandmarks,
             metrics: metrics,
             temporalFeatures: temporalFeatures,
+            contourLandmarks32: this.use32Points && contourLandmarks && contourLandmarks.length >= 32 ? contourLandmarks : null,
             confidence: confidence,
             fps: this.fpsCounter.currentFps,
             timestamp: Date.now(),
             faceDetected: true
+        });
+    }
+
+    /**
+     * ランドマーク配列を平滑化
+     * @private
+     * @param {Array|null} landmarks - ランドマーク配列
+     * @param {string} keyPrefix - 平滑化キーのプレフィックス
+     * @returns {Array|null} 平滑化されたランドマーク配列
+     */
+    _smoothLandmarks(landmarks, keyPrefix) {
+        if (!landmarks || landmarks.length === 0) {
+            return null;
+        }
+        return landmarks.map(item => {
+            const smoothedPoint = this.smoother.smooth(`${keyPrefix}${item.index}`, item.point);
+            return {
+                ...item,
+                point: smoothedPoint,
+                x: smoothedPoint.x,
+                y: smoothedPoint.y,
+                z: smoothedPoint.z || 0
+            };
         });
     }
 

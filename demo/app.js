@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            // MouthTrackerの初期化と開始
+            // MouthTrackerの初期化と開始（32点版を有効化）
             try {
                 mouthTracker = new MouthTracker(videoElement, (data) => {
                     // データ更新時のコールバック
@@ -183,7 +183,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     aspectRatio: data.metrics.aspectRatio?.toFixed(2),
                                     upperLipThickness: data.metrics.upperLipThickness?.toFixed(4),
                                     lowerLipThickness: data.metrics.lowerLipThickness?.toFixed(4),
-                                    circularity: data.metrics.circularity?.toFixed(3)
+                                    circularity: data.metrics.circularity?.toFixed(3),
+                                    cornerMovement: data.metrics.cornerMovement ? {
+                                        left: data.metrics.cornerMovement.left?.toFixed(4),
+                                        right: data.metrics.cornerMovement.right?.toFixed(4),
+                                        average: data.metrics.cornerMovement.average?.toFixed(4)
+                                    } : null,
+                                    cheekMovement: data.metrics.cheekMovement ? {
+                                        left: data.metrics.cheekMovement.left?.toFixed(4),
+                                        right: data.metrics.cheekMovement.right?.toFixed(4),
+                                        average: data.metrics.cheekMovement.average?.toFixed(4)
+                                    } : null,
+                                    jawMovement: data.metrics.jawMovement?.toFixed(4)
                                 },
                                 temporalFeatures: data.temporalFeatures ? {
                                     opennessVelocity: data.temporalFeatures.openness?.velocity?.toFixed(4),
@@ -191,17 +202,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 } : null,
                                 scores: result.scores,
                                 vowel: result.vowel,
-                                confidence: result.confidence?.toFixed(2)
+                                confidence: result.confidence?.toFixed(2),
+                                landmarkCount: data.contourLandmarks32 ? data.contourLandmarks32.length : 0
                             });
                         }
                     }
 
-                    // ランドマークを描画（全ランドマークも含む）
+                    // ランドマークを描画（32点版を優先）
                     if (visualizer) {
                         if (data.landmarks) {
                             // 顔が検出されている
                             overlayInfo.style.display = 'none';
-                            visualizer.drawLandmarks(data.landmarks, data.allLandmarks);
+                            // 顔全体のランドマークが利用可能な場合はそれを使用（既存の描画ロジックを使用しない）
+                            // 次にMOUTH_ALL_LANDMARKS、次に34点版、最後に既存の描画
+                            visualizer.drawLandmarks(data.landmarks, data.contourLandmarks32, data.allMouthLandmarksExtended, data.allFaceLandmarks);
                         } else {
                             // 顔が検出されていない
                             overlayInfo.innerHTML = '<p>顔を検出できませんでした<br>カメラに向かって顔を映してください</p>';
@@ -220,6 +234,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                             }
                         }
                     }
+                }, {
+                    use32Points: true  // 32点版を有効化
                 });
 
                 await mouthTracker.initialize();
@@ -314,7 +330,5 @@ document.addEventListener('DOMContentLoaded', async () => {
             vowelConfidenceValue.className = 'vowel-confidence';
         }
     }
-
-    // ミラーモードは削除（不要なため）
 });
 

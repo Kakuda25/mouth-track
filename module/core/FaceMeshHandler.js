@@ -3,7 +3,7 @@
  * FaceMeshの初期化と結果の処理を行います
  */
 
-import { FACE_MESH_CONFIG, MOUTH_CONTOUR_INDICES } from '../config/constants.js';
+import { FACE_MESH_CONFIG, MOUTH_CONTOUR_INDICES, MOUTH_CONTOUR_INDICES_32, MOUTH_ALL_LANDMARKS } from '../config/constants.js';
 import { structureMouthLandmarks } from '../utils/MouthLandmarks.js';
 
 // MediaPipe FaceMeshの動的インポート
@@ -148,20 +148,24 @@ export class FaceMeshHandler {
     }
 
     /**
-     * 口の輪郭ランドマークを取得（MOUTH_CONTOUR_INDICESを使用）
+     * 口の輪郭ランドマークを取得（34点版、変数名は後方互換性のため32点版と記載）
      * より多くの点を使用することで、より正確な計測が可能
      * @param {Object} results - FaceMeshの結果
-     * @returns {Array|null} 口の輪郭ランドマーク配列
+     * @param {boolean} use32Points - 34点版を使用するか（デフォルト: true、変数名は後方互換性のため32Points）
+     * @returns {Array|null} 口の輪郭ランドマーク配列（34点）
      */
-    getMouthContourLandmarks(results) {
+    getMouthContourLandmarks(results, use32Points = true) {
         if (!results || !results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
             return null;
         }
 
         const landmarks = results.multiFaceLandmarks[0];
+        
+        // 使用するインデックスを選択
+        const indices = use32Points ? MOUTH_CONTOUR_INDICES_32 : MOUTH_CONTOUR_INDICES;
 
         // ランドマークを取得（存在するもののみ）
-        const contourLandmarks = MOUTH_CONTOUR_INDICES
+        const contourLandmarks = indices
             .map(index => {
                 if (landmarks[index]) {
                     return {
@@ -177,6 +181,66 @@ export class FaceMeshHandler {
             .filter(item => item !== null);
 
         return contourLandmarks.length > 0 ? contourLandmarks : null;
+    }
+
+    /**
+     * 口周辺の全ランドマークを取得（MOUTH_ALL_LANDMARKSを使用）
+     * @param {Object} results - FaceMeshの結果
+     * @returns {Array|null} 口周辺の全ランドマーク配列
+     */
+    getAllMouthLandmarksExtended(results) {
+        if (!results || !results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+            return null;
+        }
+
+        const landmarks = results.multiFaceLandmarks[0];
+
+        // MOUTH_ALL_LANDMARKSを使用してランドマークを取得
+        const mouthLandmarks = MOUTH_ALL_LANDMARKS
+            .map(index => {
+                if (landmarks[index]) {
+                    return {
+                        index: index,
+                        point: landmarks[index],
+                        x: landmarks[index].x,
+                        y: landmarks[index].y,
+                        z: landmarks[index].z || 0
+                    };
+                }
+                return null;
+            })
+            .filter(item => item !== null);
+
+        return mouthLandmarks.length > 0 ? mouthLandmarks : null;
+    }
+
+    /**
+     * 顔全体のランドマークを取得（468個すべて）
+     * @param {Object} results - FaceMeshの結果
+     * @returns {Array|null} 顔全体のランドマーク配列（468個）
+     */
+    getAllFaceLandmarks(results) {
+        if (!results || !results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+            return null;
+        }
+
+        const landmarks = results.multiFaceLandmarks[0];
+
+        // すべてのランドマーク（468個）を取得
+        const allLandmarks = landmarks.map((point, index) => {
+            if (point) {
+                return {
+                    index: index,
+                    point: point,
+                    x: point.x,
+                    y: point.y,
+                    z: point.z || 0
+                };
+            }
+            return null;
+        }).filter(item => item !== null);
+
+        return allLandmarks.length > 0 ? allLandmarks : null;
     }
 
     /**

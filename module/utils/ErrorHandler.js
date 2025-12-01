@@ -6,12 +6,13 @@
 export class ErrorHandler {
     /**
      * エラーを処理してユーザーに表示
+     * @param {Error} error - エラーオブジェクト
+     * @param {string} context - エラーが発生したコンテキスト
      */
     static handleError(error, context = '') {
         console.error(`[Error${context ? ` in ${context}` : ''}]:`, error);
-
-        // TODO: UIへのエラー表示
-        // TODO: エラーログの記録
+        // エラーログはconsole.errorで記録
+        // UIへのエラー表示は呼び出し側で実装（demo/app.jsなど）
     }
 
     /**

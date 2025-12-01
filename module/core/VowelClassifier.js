@@ -49,10 +49,6 @@ export class VowelClassifier {
         // コールバック関数
         this.onVowelDetected = options.onVowelDetected || null;
 
-        // 新しい特徴量を使用するかどうか
-        this.useExtendedFeatures = options.useExtendedFeatures !== false; // デフォルトで有効
-        this.useTemporalFeatures = options.useTemporalFeatures !== false; // デフォルトで有効
-
         // カスタム閾値の適用
         if (options.thresholds) {
             this.thresholds = { ...this.thresholds, ...options.thresholds };
@@ -62,7 +58,7 @@ export class VowelClassifier {
     /**
      * 計測値から母音を判別
      * @param {Object} metrics - 計測値 {openness, width, area, aspectRatio, ...}
-     * @param {Object} temporalFeatures - 時間的特徴量（オプション）
+     * @param {Object} temporalFeatures - 時間的特徴量（オプション、現在は未使用。将来の改善で使用予定）
      * @returns {Object} 判別結果 {vowel, confidence, probabilities}
      */
     classify(metrics, temporalFeatures = null) {
@@ -120,24 +116,29 @@ export class VowelClassifier {
      * 各母音のスコアを計算（相対的な判定）
      * 正規化なしで、相対的な特徴量で判定
      * @private
+     * @param {number} openness - 開き具合
+     * @param {number} width - 幅
+     * @param {number} aspectRatio - アスペクト比
+     * @param {Object} metrics - 計測値（現在は未使用。将来の改善で使用予定）
+     * @param {Object} temporalFeatures - 時間的特徴量（現在は未使用。将来の改善で使用予定）
      */
     _calculateScoresRelative(openness, width, aspectRatio, metrics = null, temporalFeatures = null) {
         const scores = {};
 
         // 「あ」: 開き具合が大きい、アスペクト比が小さい（縦長）
-        scores['あ'] = this._scoreForA(openness, aspectRatio, metrics, temporalFeatures);
+        scores['あ'] = this._scoreForA(openness, aspectRatio);
 
         // 「い」: 幅が大きい、開き具合が小さい、アスペクト比が大きい（横長）
-        scores['い'] = this._scoreForI(openness, width, aspectRatio, metrics, temporalFeatures);
+        scores['い'] = this._scoreForI(openness, width, aspectRatio);
 
         // 「う」: 開き具合が小さい、幅が小さい、アスペクト比が中程度（すぼめる）
-        scores['う'] = this._scoreForU(openness, width, aspectRatio, metrics, temporalFeatures);
+        scores['う'] = this._scoreForU(openness, width, aspectRatio);
 
         // 「え」: 開き具合が中程度、幅が大きい、アスペクト比が大きい（横に広げる）
-        scores['え'] = this._scoreForE(openness, width, aspectRatio, metrics, temporalFeatures);
+        scores['え'] = this._scoreForE(openness, width, aspectRatio);
 
         // 「お」: 開き具合が中程度、幅が中程度、アスペクト比が小さい（丸い）
-        scores['お'] = this._scoreForO(openness, width, aspectRatio, metrics, temporalFeatures);
+        scores['お'] = this._scoreForO(openness, width, aspectRatio);
 
         return scores;
     }

@@ -376,6 +376,147 @@ export class DataProcessor {
     }
 
     /**
+     * 口の中心を計算（補助メソッド）
+     * @private
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
+     * @returns {Object|null} 口の中心座標 {x, y, z}
+     */
+    static _calculateMouthCenter(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return null;
+        }
+
+        // 口角の点を使用
+        const corners = contourLandmarks.filter(lm => [61, 291].includes(lm.index));
+        if (corners.length === 0) {
+            return null;
+        }
+
+        return this.calculateAveragePoint(corners.map(lm => lm.point));
+    }
+
+    /**
+     * 口角の動きを計測（34点版で追加）
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列（34点）
+     * @returns {Object} 口角の動き {left, right, average}
+     */
+    static calculateCornerMovement(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return { left: 0, right: 0, average: 0 };
+        }
+
+        // 左口角とその周辺
+        const leftCorner = contourLandmarks.find(lm => lm.index === 61);
+        const leftCornerAdjacent = contourLandmarks.filter(lm => [39, 40, 41].includes(lm.index));
+        
+        // 右口角とその周辺
+        const rightCorner = contourLandmarks.find(lm => lm.index === 291);
+        const rightCornerAdjacent = contourLandmarks.filter(lm => [269, 270, 271].includes(lm.index));
+
+        // 口角周辺の点の平均距離を計算
+        const leftMovement = leftCorner && leftCornerAdjacent.length > 0
+            ? leftCornerAdjacent.reduce((sum, lm) => sum + this.distance(leftCorner.point, lm.point), 0) / leftCornerAdjacent.length
+            : 0;
+        
+        const rightMovement = rightCorner && rightCornerAdjacent.length > 0
+            ? rightCornerAdjacent.reduce((sum, lm) => sum + this.distance(rightCorner.point, lm.point), 0) / rightCornerAdjacent.length
+            : 0;
+
+        return {
+            left: leftMovement,
+            right: rightMovement,
+            average: (leftMovement + rightMovement) / 2
+        };
+    }
+
+    /**
+     * 頬の動きを計測（34点版で追加）
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列（34点）
+     * @returns {Object} 頬の動き {left, right, average}
+     */
+    static calculateCheekMovement(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return { left: 0, right: 0, average: 0 };
+        }
+
+        const leftCheek = contourLandmarks.filter(lm => [116, 117].includes(lm.index));
+        const rightCheek = contourLandmarks.filter(lm => [345, 346].includes(lm.index));
+
+        // 頬の点の平均位置を計算
+        const leftAvg = leftCheek.length > 0
+            ? this.calculateAveragePoint(leftCheek.map(lm => lm.point))
+            : null;
+        const rightAvg = rightCheek.length > 0
+            ? this.calculateAveragePoint(rightCheek.map(lm => lm.point))
+            : null;
+
+        // 口の中心からの距離を計算（簡易版）
+        const mouthCenter = this._calculateMouthCenter(contourLandmarks);
+        
+        const leftMovement = leftAvg && mouthCenter
+            ? this.distance(leftAvg, mouthCenter)
+            : 0;
+        const rightMovement = rightAvg && mouthCenter
+            ? this.distance(rightAvg, mouthCenter)
+            : 0;
+
+        return {
+            left: leftMovement,
+            right: rightMovement,
+            average: (leftMovement + rightMovement) / 2
+        };
+    }
+
+    /**
+     * 顎の動きを計測（34点版で追加）
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列（34点）
+     * @returns {number} 顎の動き（口の中心からの距離）
+     */
+    static calculateJawMovement(contourLandmarks) {
+        if (!contourLandmarks || contourLandmarks.length === 0) {
+            return 0;
+        }
+
+        const jawPoints = contourLandmarks.filter(lm => [175, 176, 172, 397].includes(lm.index));
+        
+        if (jawPoints.length === 0) {
+            return 0;
+        }
+
+        const jawAvg = this.calculateAveragePoint(jawPoints.map(lm => lm.point));
+        const mouthCenter = this._calculateMouthCenter(contourLandmarks);
+
+        return jawAvg && mouthCenter
+            ? this.distance(jawAvg, mouthCenter)
+            : 0;
+    }
+
+    /**
+     * 34点版の計測値を計算
+     * @param {Object} mouthLandmarks - 口ランドマーク
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列（34点）
+     * @returns {Object} 計測値（拡張特徴量を含む）
+     */
+    static calculateMetricsFromContour32(mouthLandmarks, contourLandmarks) {
+        // 既存の16点版の計測値を計算
+        const baseMetrics = this.calculateAllMetrics(mouthLandmarks, contourLandmarks);
+
+        // 34点版の追加特徴量を計算（32点以上の場合のみ、後方互換性のため32点チェック）
+        if (contourLandmarks && contourLandmarks.length >= 32) {
+            baseMetrics.cornerMovement = this.calculateCornerMovement(contourLandmarks);
+            baseMetrics.cheekMovement = this.calculateCheekMovement(contourLandmarks);
+            baseMetrics.jawMovement = this.calculateJawMovement(contourLandmarks);
+        } else {
+            // 32点未満の場合はデフォルト値（34点版の機能を使用するには32点以上が必要）
+            baseMetrics.cornerMovement = { left: 0, right: 0, average: 0 };
+            baseMetrics.cheekMovement = { left: 0, right: 0, average: 0 };
+            baseMetrics.jawMovement = 0;
+        }
+
+        return baseMetrics;
+    }
+
+    /**
      * ランドマークデータから全計測値を計算
      * @param {Object} mouthLandmarks - 口ランドマーク
      * @param {Array} contourLandmarks - 口の輪郭ランドマーク（オプション、より正確な計測に使用）
