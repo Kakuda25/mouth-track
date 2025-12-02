@@ -9,6 +9,8 @@ export class VowelClassifier {
         this.historyLength = options.historyLength || 7;
         this.vowelHistory = [];
         this.calibrationProfiles = options.calibrationProfiles || {};
+        this.smoothingAlpha = typeof options.smoothingAlpha === 'number' ? options.smoothingAlpha : 0.6;
+        this.probabilityEma = null;
         this.labelMap = options.labelMap || {
             a: 'あ',
             i: 'い',
@@ -21,13 +23,13 @@ export class VowelClassifier {
 
         this.thresholds = {
             closed: {
-                openness: 0.012,
-                opennessRatio: 1.3
+                openness: 0.018,
+                opennessRatio: 1.4
             },
             vowels: {
                 a: {
-                    openness: { optimal: 0.1, sigma: 0.025, penaltyThreshold: 0.08 },
-                    aspectRatio: { min: 0.8, max: 1.8, falloffRange: 2.0 },
+                    openness: { optimal: 0.11, sigma: 0.02, penaltyThreshold: 0.09 },
+                    aspectRatio: { min: 1.1, max: 1.9, falloffRange: 1.6 },
                     area: { max: 0.025 }
                 },
                 i: {
@@ -82,19 +84,19 @@ export class VowelClassifier {
         }
 
         const scores = this._calculateScores(metrics);
-        const maxScore = Math.max(...Object.values(scores));
-
-        const minScoreThreshold = metrics.openness < 0.03 ? 0.4 : 0.25;
+        const { vowel: topVowel, maxScore } = this._selectTopVowel(scores);
+        const minScoreThreshold = this._getMinScoreThreshold(metrics);
         if (maxScore < minScoreThreshold) {
             return this._createEmptyResult();
         }
 
-        const vowel = Object.keys(scores).find(key => scores[key] === maxScore);
         const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
         const probabilities = this._calculateProbabilities(scores, totalScore);
-        const smoothed = this._smoothVowel(vowel, probabilities[vowel] || 0, temporalFeatures);
+        const smoothedProbabilities = this._smoothProbabilities(probabilities);
+        const smoothed = this._smoothVowel(topVowel, smoothedProbabilities[topVowel] || 0, temporalFeatures);
 
-        return this._createResult(smoothed.vowel, smoothed.confidence, probabilities, metrics, scores);
+        const gated = this._applyConfidenceGate(smoothed);
+        return this._createResult(gated.vowel, gated.confidence, smoothedProbabilities, metrics, scores);
     }
 
     _hasRequiredMetrics(metrics) {
@@ -112,8 +114,9 @@ export class VowelClassifier {
     }
 
     _scoreForA(metrics) {
-        const { openness = 0, aspectRatio = 0, area = 0 } = metrics;
+        const { openness = 0, aspectRatio = 0, area = 0, width = 0, jawMovement = 0 } = metrics;
         const config = this.thresholds.vowels.a;
+        const jawRatio = width > 0 ? jawMovement / width : 0;
 
         const openScore = this._gaussianScore(openness, this._getOptimal('a', 'openness', config.openness.optimal), this._getSigma('a', 'openness', config.openness.sigma));
         const aspectScore = this._clampedRatio(aspectRatio, config.aspectRatio.min, config.aspectRatio.max, config.aspectRatio.falloffRange);
@@ -122,12 +125,20 @@ export class VowelClassifier {
         const combined = (openScore * 0.65) + (aspectScore * 0.25) + (areaScore * 0.1);
         
         if (openness < config.openness.penaltyThreshold) {
-            const penaltyFactor = Math.max(0.15, openness / config.openness.penaltyThreshold);
-            return combined * penaltyFactor * 0.35;
+            const penaltyFactor = Math.max(0.18, openness / config.openness.penaltyThreshold);
+            return combined * penaltyFactor * 0.32;
         }
         
-        if (openness < 0.08) {
-            return combined * 0.75;
+        if (openness < 0.09) {
+            return combined * 0.65;
+        }
+
+        if (aspectRatio < 1.1) {
+            return combined * 0.38;
+        }
+
+        if (jawRatio > 0 && jawRatio < 0.6) {
+            return combined * 0.55;
         }
         
         return combined;
@@ -145,11 +156,11 @@ export class VowelClassifier {
         const lipRatio = width > 0 ? (upperLipThickness + lowerLipThickness) / width : 0;
         const lipScore = this._gaussianScore(lipRatio, this._getOptimal('i', 'lipThicknessRatio', config.lipThicknessRatio.optimal), this._getSigma('i', 'lipThicknessRatio', config.lipThicknessRatio.sigma));
 
-        const combined = (aspectScore * 0.45) + (opennessScore * 0.25) + (widthScore * 0.15) + (cornerScore * 0.1) + (lipScore * 0.05);
-        if (aspectRatio < config.aspectRatio.min) return combined * 0.25;
-        if (openness > config.openness.penaltyThreshold) return combined * 0.4;
-        if (openness < 0.035) {
-            return combined * 0.6;
+        const combined = (aspectScore * 0.35) + (opennessScore * 0.15) + (widthScore * 0.3) + (cornerScore * 0.1) + (lipScore * 0.1);
+        if (aspectRatio < config.aspectRatio.min) return combined * 0.22;
+        if (openness > config.openness.penaltyThreshold) return combined * 0.38;
+        if (openness < 0.04) {
+            return combined * 0.55;
         }
         return combined;
     }
@@ -165,10 +176,10 @@ export class VowelClassifier {
         const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.2;
 
         const combined = (widthScore * 0.25) + (circularityScore * 0.25) + (opennessScore * 0.2) + (protrusionScore * 0.2) + (aspectScore * 0.1);
-        if (width > config.width.penaltyThreshold) return combined * 0.2;
-        if (circularity < config.circularity.penaltyThreshold) return combined * 0.4;
-        if (openness < 0.035) {
-            return combined * 0.5;
+        if (width > config.width.penaltyThreshold) return combined * 0.18;
+        if (circularity < config.circularity.penaltyThreshold) return combined * 0.38;
+        if (openness < 0.04) {
+            return combined * 0.48;
         }
         return combined;
     }
@@ -185,12 +196,12 @@ export class VowelClassifier {
         const gap = Math.abs(upperLipThickness - lowerLipThickness);
         const lipGapScore = this._gaussianScore(gap, this._getOptimal('e', 'lipThicknessGap', config.lipThicknessGap.optimal), this._getSigma('e', 'lipThicknessGap', config.lipThicknessGap.sigma));
 
-        const combined = (aspectScore * 0.35) + (opennessScore * 0.3) + (widthScore * 0.15) + (cornerScore * 0.1) + (lipGapScore * 0.1);
-        if (aspectRatio < config.aspectRatio.penaltyThreshold) return combined * 0.4;
-        if (openness < config.openness.min) return combined * 0.15;
-        if (openness > config.openness.max) return combined * 0.4;
-        if (openness < 0.035) {
-            return combined * 0.4;
+        const combined = (aspectScore * 0.28) + (opennessScore * 0.2) + (widthScore * 0.3) + (cornerScore * 0.1) + (lipGapScore * 0.12);
+        if (aspectRatio < config.aspectRatio.penaltyThreshold) return combined * 0.35;
+        if (openness < config.openness.min) return combined * 0.08;
+        if (openness > config.openness.max) return combined * 0.35;
+        if (openness < 0.04) {
+            return combined * 0.35;
         }
         return combined;
     }
@@ -208,9 +219,9 @@ export class VowelClassifier {
         const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.2;
 
         const combined = (circularityScore * 0.3) + (thicknessScore * 0.2) + (protrusionScore * 0.2) + (opennessScore * 0.15) + (widthScore * 0.15);
-        if (circularity < config.circularity.penaltyThreshold) return combined * 0.3;
-        if (openness < 0.045) {
-            return combined * 0.5;
+        if (circularity < config.circularity.penaltyThreshold) return combined * 0.28;
+        if (openness < 0.05) {
+            return combined * 0.48;
         }
         return combined;
     }
@@ -230,28 +241,44 @@ export class VowelClassifier {
     _isMouthClosed(metrics) {
         const { openness, upperLipThickness = 0, lowerLipThickness = 0, width = 0 } = metrics;
 
-        if (openness <= 0.012) {
+        if (openness <= 0.018) {
             return true;
         }
 
         const thicknessSum = upperLipThickness + lowerLipThickness;
         const thicknessRatio = width > 0 ? thicknessSum / width : 0;
-        if (openness <= 0.02 && thicknessRatio > 0.25) {
+        if (openness <= 0.028 && thicknessRatio > 0.25) {
             return true;
         }
 
         if (this.baseline) {
             const baselineOpenness = this.baseline.openness || 0.01;
-            const opennessRatio = this.thresholds.closed?.opennessRatio ?? 1.3;
+            const opennessRatio = this.thresholds.closed?.opennessRatio ?? 1.4;
             return openness <= baselineOpenness * opennessRatio;
         }
 
-        const closedOpennessThreshold = this.thresholds.closed?.openness ?? 0.012;
+        const closedOpennessThreshold = this.thresholds.closed?.openness ?? 0.018;
         if (openness <= closedOpennessThreshold) {
             return true;
         }
 
         return false;
+    }
+
+    _getMinScoreThreshold(metrics) {
+        return metrics.openness < 0.04 ? 0.45 : 0.28;
+    }
+
+    _selectTopVowel(scores) {
+        let maxScore = -Infinity;
+        let topVowel = null;
+        for (const [vowel, score] of Object.entries(scores)) {
+            if (score > maxScore) {
+                maxScore = score;
+                topVowel = vowel;
+            }
+        }
+        return { vowel: topVowel, maxScore };
     }
 
     _calculateProbabilities(scores, totalScore) {
@@ -277,6 +304,24 @@ export class VowelClassifier {
         };
     }
 
+    _smoothProbabilities(probabilities) {
+        const keys = ['a', 'i', 'u', 'e', 'o', 'closed'];
+        if (!this.probabilityEma) {
+            this.probabilityEma = { ...probabilities };
+            return { ...probabilities };
+        }
+
+        const alpha = this.smoothingAlpha;
+        const smoothed = {};
+        keys.forEach(key => {
+            const prev = this.probabilityEma[key] || 0;
+            const curr = probabilities[key] || 0;
+            smoothed[key] = prev * alpha + curr * (1 - alpha);
+        });
+        this.probabilityEma = smoothed;
+        return smoothed;
+    }
+
     _smoothVowel(vowel, confidence, temporalFeatures) {
         if (!vowel) {
             this.vowelHistory = [];
@@ -290,7 +335,7 @@ export class VowelClassifier {
 
         const counts = {};
         this.vowelHistory.forEach(item => {
-            counts[item.vowel] = (counts[item.vowel] || 0) + 1;
+            counts[item.vowel] = (counts[item.vowel] || 0) + (item.confidence || 0);
         });
 
         let majority = vowel;
@@ -302,12 +347,21 @@ export class VowelClassifier {
             }
         });
 
+        const safeCount = majorityCount > 0 ? majorityCount : 1;
         const avgConfidence = this.vowelHistory
             .filter(item => item.vowel === majority)
-            .reduce((sum, item) => sum + item.confidence, 0) / majorityCount;
+            .reduce((sum, item) => sum + item.confidence, 0) / safeCount;
 
         const penalty = this._transitionPenalty(temporalFeatures);
         return { vowel: majority, confidence: avgConfidence * penalty };
+    }
+
+    _applyConfidenceGate(smoothed) {
+        const isConfident = smoothed.confidence >= 0.5;
+        return {
+            vowel: isConfident ? smoothed.vowel : null,
+            confidence: isConfident ? smoothed.confidence : 0
+        };
     }
 
     _transitionPenalty(temporalFeatures) {

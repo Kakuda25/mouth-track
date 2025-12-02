@@ -15,7 +15,9 @@
       "updated_at": "2025-12-03T00:00:00Z",
       "owner": "agent",
       "priority": "high",
-      "tags": ["setup"],
+      "tags": [
+        "setup"
+      ],
       "logs": [
         {
           "timestamp": "2025-12-03T00:00:00Z",
@@ -23,7 +25,9 @@
           "message": "スキーマ案を作成・初期タスク完了"
         }
       ],
-      "artifacts": ["初期化.md"],
+      "artifacts": [
+        "初期化.md"
+      ],
       "related": []
     },
     {
@@ -35,7 +39,11 @@
       "updated_at": "2025-01-27T00:00:00Z",
       "owner": "agent",
       "priority": "high",
-      "tags": ["vowel-detection", "documentation", "tuning"],
+      "tags": [
+        "vowel-detection",
+        "documentation",
+        "tuning"
+      ],
       "logs": [
         {
           "timestamp": "2025-01-27T00:00:00Z",
@@ -53,7 +61,9 @@
           "message": "docs/VOWEL_DETECTION_DETAILED.mdを作成完了。各母音（あ、い、う、え、お）の判定項目、閾値、重み付け、スコア計算方法、閉口判定、時系列平滑化、数値調整の指針を詳細に記録"
         }
       ],
-      "artifacts": ["docs/VOWEL_DETECTION_DETAILED.md"],
+      "artifacts": [
+        "docs/VOWEL_DETECTION_DETAILED.md"
+      ],
       "related": []
     },
     {
@@ -65,7 +75,11 @@
       "updated_at": "2025-01-27T00:00:00Z",
       "owner": "agent",
       "priority": "high",
-      "tags": ["vowel-detection", "bug-fix", "tuning"],
+      "tags": [
+        "vowel-detection",
+        "bug-fix",
+        "tuning"
+      ],
       "estimate": "4h",
       "logs": [
         {
@@ -84,8 +98,12 @@
           "message": "修正計画に沿って実装完了。フェーズ1: 閉口判定の強化（閾値0.015→0.012、例外条件削除）、フェーズ2: 「あ」のスコア計算修正（ペナルティ強化、閾値調整）、フェーズ3: 他の母音のスコア計算調整（ペナルティ強化、閉口に近い状態での追加ペナルティ）、フェーズ4: 最小スコア閾値の動的調整を実装"
         }
       ],
-      "artifacts": ["order/description/3-母音判定基準の修正計画.md"],
-      "related": [2]
+      "artifacts": [
+        "order/description/3-母音判定基準の修正計画.md"
+      ],
+      "related": [
+        2
+      ]
     },
     {
       "id": 4,
@@ -96,7 +114,11 @@
       "updated_at": "2025-01-27T00:00:00Z",
       "owner": "agent",
       "priority": "high",
-      "tags": ["vowel-detection", "bug-fix", "tuning"],
+      "tags": [
+        "vowel-detection",
+        "bug-fix",
+        "tuning"
+      ],
       "estimate": "3h",
       "logs": [
         {
@@ -120,8 +142,96 @@
           "message": "再修正計画に沿って実装完了。ステップ1: 最小スコア閾値の緩和（0.5→0.4、0.3→0.25）、ステップ2: ペナルティの緩和（い、う、え、お）、ステップ3: 「あ」のペナルティ調整、ステップ4: 閉口判定の微調整、ステップ5: 唇の突き出し判定の強化（う、おの重み付け10%→20%、デフォルト0.4→0.2）"
         }
       ],
-      "artifacts": ["order/description/4-母音判定基準の再修正計画.md"],
-      "related": [2, 3]
+      "artifacts": [
+        "order/description/4-母音判定基準の再修正計画.md"
+      ],
+      "related": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": 5,
+      "title": "母音判定基準の最終修正",
+      "description": "再修正後、新たな問題が発生: 1) 閉口状態で「え」が判定される（再発） 2) 口を開くと「あ」としてしか判定されない 3) 口を隠すと閉口判定（正常）。閉口判定を再強化し、「え」のペナルティを再強化し、最小スコア閾値を調整する",
+      "status": "completed",
+      "created_at": "2025-01-27T00:00:00Z",
+      "updated_at": "2025-01-27T00:00:00Z",
+      "owner": "agent",
+      "priority": "critical",
+      "tags": [
+        "vowel-detection",
+        "bug-fix",
+        "tuning"
+      ],
+      "estimate": "3h",
+      "logs": [
+        {
+          "timestamp": "2025-01-27T00:00:00Z",
+          "author": "agent",
+          "message": "再修正後の新たな問題を分析。主な原因: 1) 閉口判定が緩すぎる（0.012は低すぎる） 2) 「え」のペナルティが緩すぎる（0.15では不十分） 3) 最小スコア閾値が低すぎる（0.4では誤判定を防げない） 4) ペナルティの緩和が過度だった"
+        },
+        {
+          "timestamp": "2025-01-27T00:00:00Z",
+          "author": "agent",
+          "message": "最終修正計画ドキュメントを作成完了。5つのステップで段階的に実装: 1) 閉口判定の再強化（0.012→0.018） 2) 「え」のペナルティ再強化（0.15→0.08） 3) 最小スコア閾値の調整（0.4→0.45） 4) 他の母音のペナルティ微調整 5) 「あ」のペナルティ微調整"
+        },
+        {
+          "timestamp": "2025-01-27T00:00:00Z",
+          "author": "agent",
+          "message": "最終修正計画に沿って実装完了。ステップ1: 閉口判定の再強化（絶対閾値0.012→0.018、厚み比率判定0.02→0.028、closed閾値0.012→0.018、opennessRatio 1.3→1.4）、ステップ2: 「え」のペナルティ再強化（0.15→0.08、0.4→0.35、閾値0.035→0.04）、ステップ3: 最小スコア閾値の調整（0.4→0.45、0.25→0.28、閾値0.03→0.04）、ステップ4: 他の母音のペナルティ微調整（い、う、お）、ステップ5: 「あ」のペナルティ微調整（0.15→0.18、0.35→0.38、0.75→0.78）"
+        }
+      ],
+      "artifacts": [
+        "order/description/5-母音判定基準の最終修正計画.md"
+      ],
+      "related": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": 6,
+      "title": "母音判定の安定化（平滑化と閾値再調整）",
+      "description": "実測で「え」と表示されるべき口形状が「あ」に揺れる問題に対応する。静的特徴閾値の再設定、動的平滑化（複数フレーム投票/EMA）、閉口・開口判定の再確認、データ確認を行う。",
+      "status": "in-progress",
+      "created_at": "2025-12-03T00:00:00Z",
+      "updated_at": "2025-12-02T23:04:30.438Z",
+      "owner": "agent",
+      "priority": "high",
+      "tags": [
+        "vowel-detection",
+        "tuning",
+        "stabilization"
+      ],
+      "logs": [
+        {
+          "timestamp": "2025-12-03T00:00:00Z",
+          "author": "agent",
+          "message": "実測値: openness 0.045〜0.05, width 0.51〜0.52, aspectRatio 10〜11 で「え」「い」寄り形状にもかかわらず「あ/え」が揺れる。スコア差が小さく信頼度32〜51%で低位。動的特徴(opennessVelocity/widthVelocity)がほぼ0で安定判定が効いていない。"
+        },
+        {
+          "timestamp": "2025-12-03T00:00:00Z",
+          "author": "agent",
+          "message": "対策案: 1) 静的閾値を再調整（「あ」の開口・縦横比の下限を上げる/「え・い」の横幅比を強調） 2) 直近Nフレーム多数決またはEMAで平滑化し、50%未満は未確定表示 3) ランドマーク座標のEMAで揺れを抑制 4) 特徴量追加（唇厚み比・口角上下差・顎変位の正規化）でスコア分離を改善。"
+        },
+        {
+          "timestamp": "2025-12-02T23:04:30.438Z",
+          "author": "agent",
+          "message": "VowelClassifierに開口/縦横比閾値の強化、i/e横幅重み増、EMA確率平滑＋50%未満未確定処理を追加。"
+        }
+      ],
+      "artifacts": [
+        "order/description/5-母音判定基準の最終修正計画.md",
+        "docs/VOWEL_DETECTION_DETAILED.md"
+      ],
+      "related": [
+        2,
+        3,
+        4,
+        5
+      ]
     }
   ]
 }
