@@ -21,13 +21,13 @@ export class VowelClassifier {
 
         this.thresholds = {
             closed: {
-                openness: 0.015,
-                opennessRatio: 1.5
+                openness: 0.012,
+                opennessRatio: 1.3
             },
             vowels: {
                 a: {
-                    openness: { optimal: 0.1, sigma: 0.03, penaltyThreshold: 0.06 },
-                    aspectRatio: { min: 0.8, max: 1.8, falloffRange: 2.5 },
+                    openness: { optimal: 0.1, sigma: 0.025, penaltyThreshold: 0.08 },
+                    aspectRatio: { min: 0.8, max: 1.8, falloffRange: 2.0 },
                     area: { max: 0.025 }
                 },
                 i: {
@@ -84,7 +84,8 @@ export class VowelClassifier {
         const scores = this._calculateScores(metrics);
         const maxScore = Math.max(...Object.values(scores));
 
-        if (maxScore < 0.3) {
+        const minScoreThreshold = metrics.openness < 0.03 ? 0.4 : 0.25;
+        if (maxScore < minScoreThreshold) {
             return this._createEmptyResult();
         }
 
@@ -119,7 +120,16 @@ export class VowelClassifier {
         const areaScore = Math.min(area / (config.area.max || 0.02), 1.0);
 
         const combined = (openScore * 0.65) + (aspectScore * 0.25) + (areaScore * 0.1);
-        if (openness < config.openness.penaltyThreshold) return combined * 0.3;
+        
+        if (openness < config.openness.penaltyThreshold) {
+            const penaltyFactor = Math.max(0.15, openness / config.openness.penaltyThreshold);
+            return combined * penaltyFactor * 0.35;
+        }
+        
+        if (openness < 0.08) {
+            return combined * 0.75;
+        }
+        
         return combined;
     }
 
@@ -136,8 +146,11 @@ export class VowelClassifier {
         const lipScore = this._gaussianScore(lipRatio, this._getOptimal('i', 'lipThicknessRatio', config.lipThicknessRatio.optimal), this._getSigma('i', 'lipThicknessRatio', config.lipThicknessRatio.sigma));
 
         const combined = (aspectScore * 0.45) + (opennessScore * 0.25) + (widthScore * 0.15) + (cornerScore * 0.1) + (lipScore * 0.05);
-        if (aspectRatio < config.aspectRatio.min) return combined * 0.3;
-        if (openness > config.openness.penaltyThreshold) return combined * 0.5;
+        if (aspectRatio < config.aspectRatio.min) return combined * 0.25;
+        if (openness > config.openness.penaltyThreshold) return combined * 0.4;
+        if (openness < 0.035) {
+            return combined * 0.6;
+        }
         return combined;
     }
 
@@ -149,11 +162,14 @@ export class VowelClassifier {
         const circularityScore = circularity;
         const opennessScore = openness < config.openness.max ? 1.0 : Math.max(0, 1.0 - (openness - config.openness.max) / config.openness.sigma);
         const aspectScore = (aspectRatio >= config.aspectRatio.min && aspectRatio <= config.aspectRatio.max) ? 1.0 : 0.6;
-        const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.4;
+        const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.2;
 
-        const combined = (widthScore * 0.3) + (circularityScore * 0.3) + (opennessScore * 0.2) + (aspectScore * 0.1) + (protrusionScore * 0.1);
-        if (width > config.width.penaltyThreshold) return combined * 0.25;
-        if (circularity < config.circularity.penaltyThreshold) return combined * 0.5;
+        const combined = (widthScore * 0.25) + (circularityScore * 0.25) + (opennessScore * 0.2) + (protrusionScore * 0.2) + (aspectScore * 0.1);
+        if (width > config.width.penaltyThreshold) return combined * 0.2;
+        if (circularity < config.circularity.penaltyThreshold) return combined * 0.4;
+        if (openness < 0.035) {
+            return combined * 0.5;
+        }
         return combined;
     }
 
@@ -170,9 +186,12 @@ export class VowelClassifier {
         const lipGapScore = this._gaussianScore(gap, this._getOptimal('e', 'lipThicknessGap', config.lipThicknessGap.optimal), this._getSigma('e', 'lipThicknessGap', config.lipThicknessGap.sigma));
 
         const combined = (aspectScore * 0.35) + (opennessScore * 0.3) + (widthScore * 0.15) + (cornerScore * 0.1) + (lipGapScore * 0.1);
-        if (aspectRatio < config.aspectRatio.penaltyThreshold) return combined * 0.5;
-        if (openness < config.openness.min) return combined * 0.2; // 閉口に近い場合は強く減衰
-        if (openness > config.openness.max) return combined * 0.5;
+        if (aspectRatio < config.aspectRatio.penaltyThreshold) return combined * 0.4;
+        if (openness < config.openness.min) return combined * 0.15;
+        if (openness > config.openness.max) return combined * 0.4;
+        if (openness < 0.035) {
+            return combined * 0.4;
+        }
         return combined;
     }
 
@@ -186,10 +205,13 @@ export class VowelClassifier {
         const thicknessScore = this._gaussianScore(thicknessRatio, this._getOptimal('o', 'thicknessRatio', config.thicknessRatio.optimal), this._getSigma('o', 'thicknessRatio', config.thicknessRatio.sigma));
         const opennessScore = this._gaussianScore(openness, this._getOptimal('o', 'openness', config.openness.optimal), this._getSigma('o', 'openness', config.openness.sigma));
         const widthScore = this._gaussianScore(width, this._getOptimal('o', 'width', config.width.optimal), this._getSigma('o', 'width', config.width.sigma));
-        const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.4;
+        const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.2;
 
-        const combined = (circularityScore * 0.35) + (thicknessScore * 0.25) + (opennessScore * 0.15) + (widthScore * 0.15) + (protrusionScore * 0.1);
-        if (circularity < config.circularity.penaltyThreshold) return combined * 0.4;
+        const combined = (circularityScore * 0.3) + (thicknessScore * 0.2) + (protrusionScore * 0.2) + (opennessScore * 0.15) + (widthScore * 0.15);
+        if (circularity < config.circularity.penaltyThreshold) return combined * 0.3;
+        if (openness < 0.045) {
+            return combined * 0.5;
+        }
         return combined;
     }
 
@@ -206,33 +228,27 @@ export class VowelClassifier {
     }
 
     _isMouthClosed(metrics) {
-        const { openness, aspectRatio, upperLipThickness = 0, lowerLipThickness = 0, width = 0 } = metrics;
+        const { openness, upperLipThickness = 0, lowerLipThickness = 0, width = 0 } = metrics;
 
-        // 絶対閾値で早期判定（閉口寄り）
-        if (openness <= 0.02) {
+        if (openness <= 0.012) {
             return true;
         }
 
-        // 厚みと幅の比率が高い（隙間がほぼ無い）場合は閉口扱い
         const thicknessSum = upperLipThickness + lowerLipThickness;
         const thicknessRatio = width > 0 ? thicknessSum / width : 0;
-        if (openness <= 0.03 && thicknessRatio > 0.25) {
+        if (openness <= 0.02 && thicknessRatio > 0.25) {
             return true;
         }
 
         if (this.baseline) {
             const baselineOpenness = this.baseline.openness || 0.01;
-            const opennessRatio = this.thresholds.closed?.opennessRatio ?? 1.5;
+            const opennessRatio = this.thresholds.closed?.opennessRatio ?? 1.3;
             return openness <= baselineOpenness * opennessRatio;
         }
 
-        const closedOpennessThreshold = this.thresholds.closed?.openness ?? 0.015;
+        const closedOpennessThreshold = this.thresholds.closed?.openness ?? 0.012;
         if (openness <= closedOpennessThreshold) {
             return true;
-        }
-
-        if (openness <= 0.025 && aspectRatio > 8.0) {
-            return false;
         }
 
         return false;
