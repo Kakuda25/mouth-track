@@ -55,6 +55,32 @@
       ],
       "artifacts": ["docs/VOWEL_DETECTION_DETAILED.md"],
       "related": []
+    },
+    {
+      "id": 3,
+      "title": "母音判定基準の修正",
+      "description": "現状の問題（閉口状態で「え」が判定される、すべての母音が「あ」として判定される）を解決するため、判定基準を修正する",
+      "status": "not-started",
+      "created_at": "2025-01-27T00:00:00Z",
+      "updated_at": "2025-01-27T00:00:00Z",
+      "owner": "agent",
+      "priority": "high",
+      "tags": ["vowel-detection", "bug-fix", "tuning"],
+      "estimate": "4h",
+      "logs": [
+        {
+          "timestamp": "2025-01-27T00:00:00Z",
+          "author": "agent",
+          "message": "問題を分析し、修正計画を作成。主な問題: 1) 閉口判定の閾値が緩すぎる 2) 「あ」のスコア計算が他の母音より高くなりすぎている 3) 閉口判定の例外条件が問題を引き起こしている"
+        },
+        {
+          "timestamp": "2025-01-27T00:00:00Z",
+          "author": "agent",
+          "message": "修正計画ドキュメントを作成完了。4つのフェーズに分けて段階的に実装する計画を策定"
+        }
+      ],
+      "artifacts": ["order/description/3-母音判定基準の修正計画.md"],
+      "related": [2]
     }
   ]
 }
