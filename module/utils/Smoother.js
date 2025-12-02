@@ -4,7 +4,7 @@
  */
 
 export class Smoother {
-    constructor(smoothingFactor = 0.5) {
+    constructor(smoothingFactor = 0.7) {
         this.smoothingFactor = smoothingFactor;
         this.previousValues = {};
     }

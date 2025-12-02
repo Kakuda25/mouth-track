@@ -16,7 +16,7 @@ export class MouthTracker {
         this.onDataUpdate = onDataUpdate || (() => { });
         this.faceMeshHandler = new FaceMeshHandler();
         // 依存性注入: Smootherをカスタマイズ可能にする
-        this.smoother = options.smoother || new Smoother(options.smoothingFactor || 0.5);
+        this.smoother = options.smoother || new Smoother(options.smoothingFactor || 0.65);
         // 時間的特徴量抽出器を初期化
         this.temporalExtractor = options.temporalExtractor || new TemporalFeatureExtractor({
             bufferSize: options.temporalBufferSize || 30
@@ -88,16 +88,38 @@ export class MouthTracker {
 
         const smoothedLandmarks = this._smoothMouthLandmarksObject(mouthLandmarks);
         const smoothedAllMouthLandmarksExtended = this._smoothLandmarks(allMouthLandmarksExtended, 'all_extended_');
+        const smoothedAllFaceLandmarks = this._smoothLandmarks(allFaceLandmarks, 'face_');
+
+        const qualityTarget = contourLandmarks || smoothedAllMouthLandmarksExtended || smoothedAllFaceLandmarks;
+        const quality = this._assessQuality(qualityTarget);
+        if (!quality.passed) {
+            this.updateFPS();
+            this.onDataUpdate({
+                landmarks: smoothedLandmarks,
+                allMouthLandmarksExtended: smoothedAllMouthLandmarksExtended,
+                allFaceLandmarks: smoothedAllFaceLandmarks,
+                metrics: null,
+                temporalFeatures: null,
+                contourLandmarks34: this.use34Points && contourLandmarks && contourLandmarks.length >= 34 ? contourLandmarks : null,
+                confidence: 0,
+                fps: this.fpsCounter.currentFps,
+                timestamp: Date.now(),
+                faceDetected: true,
+                quality
+            });
+            return;
+        }
 
         let metrics;
         if (this.use34Points && contourLandmarks && contourLandmarks.length >= 34) {
             metrics = DataProcessor.calculateMetricsFromContour34(
                 smoothedLandmarks, 
                 contourLandmarks,
-                smoothedAllMouthLandmarksExtended
+                smoothedAllMouthLandmarksExtended,
+                smoothedAllFaceLandmarks
             );
         } else {
-            metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks, smoothedAllMouthLandmarksExtended);
+            metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks, smoothedAllMouthLandmarksExtended, smoothedAllFaceLandmarks);
         }
 
         if (this.lastMetrics) {
@@ -119,8 +141,6 @@ export class MouthTracker {
         const temporalFeatures = this.temporalExtractor.getAllTemporalFeatures();
         this.updateFPS();
 
-        const smoothedAllFaceLandmarks = this._smoothLandmarks(allFaceLandmarks, 'face_');
-
         this.onDataUpdate({
             landmarks: smoothedLandmarks,
             allMouthLandmarksExtended: smoothedAllMouthLandmarksExtended,
@@ -131,7 +151,8 @@ export class MouthTracker {
             confidence: confidence,
             fps: this.fpsCounter.currentFps,
             timestamp: Date.now(),
-            faceDetected: true
+            faceDetected: true,
+            quality
         });
     }
 
@@ -315,5 +336,30 @@ export class MouthTracker {
     getIsCalibrating() {
         return this.calibrationManager.getIsCalibrating();
     }
-}
 
+    /**
+     * ランドマーク品質を簡易評価
+     * @private
+     * @param {Array|null} landmarks - 使用するランドマーク群
+     * @returns {Object} 品質評価結果
+     */
+    _assessQuality(landmarks) {
+        if (!landmarks || landmarks.length < 5) {
+            return { passed: true, reason: 'insufficient_landmarks_bypassed' };
+        }
+
+        const zValues = landmarks
+            .map(lm => (lm.point || lm)?.z)
+            .filter(z => typeof z === 'number');
+
+        if (zValues.length < 5) {
+            return { passed: true, reason: 'insufficient_z_bypassed' };
+        }
+
+        const mean = zValues.reduce((sum, z) => sum + z, 0) / zValues.length;
+        const variance = zValues.reduce((sum, z) => sum + Math.pow(z - mean, 2), 0) / zValues.length;
+        const stdDev = Math.sqrt(variance);
+
+        return { passed: stdDev <= 0.04, stdDev };
+    }
+}

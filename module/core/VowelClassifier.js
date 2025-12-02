@@ -1,230 +1,224 @@
 /**
  * VowelClassifier - 母音判別クラス
- * 画像分析に基づいた高精度な母音判定ロジック
- * 
- * 各母音の視覚的特徴:
- * - 閉: openness ≈ 0, width ≈ 中程度
- * - あ: openness 最大（0.08-0.15）, aspectRatio 小（0.8-2.0）
- * - い: aspectRatio 最大（5.0-10.0）, openness 最小（0.01-0.03）
- * - う: width 最小（0.03-0.05）, circularity 高, openness 小（0.02-0.04）
- * - え: aspectRatio 大（2.5-4.0）, openness 中（0.03-0.06）
- * - お: circularity 高, aspectRatio 小（0.8-1.5）, openness 中（0.04-0.07）
+ * 計測値を正規化された特徴として受け取り、母音ラベルを推定する。
  */
 export class VowelClassifier {
     constructor(options = {}) {
         this.baseline = options.baseline || null;
         this.onVowelDetected = options.onVowelDetected || null;
-        
+        this.historyLength = options.historyLength || 7;
+        this.vowelHistory = [];
+        this.calibrationProfiles = options.calibrationProfiles || {};
+        this.labelMap = options.labelMap || {
+            a: 'あ',
+            i: 'い',
+            u: 'う',
+            e: 'え',
+            o: 'お',
+            closed: '閉口',
+            null: '-'
+        };
+
         this.thresholds = {
             closed: {
                 openness: 0.015,
                 opennessRatio: 1.5
             },
             vowels: {
-                'あ': { 
-                    openness: { min: 0.08, optimal: 0.12, sigma: 0.04, penaltyThreshold: 0.06 }, 
-                    aspectRatio: { min: 0.5, max: 2.0, falloffStart: 2.0, falloffRange: 3.0 },
-                    area: { max: 0.015 }
+                a: {
+                    openness: { optimal: 0.1, sigma: 0.03, penaltyThreshold: 0.06 },
+                    aspectRatio: { min: 0.8, max: 1.8, falloffRange: 2.5 },
+                    area: { max: 0.025 }
                 },
-                'い': { 
-                    openness: { max: 0.03, penaltyThreshold: 0.05 }, 
-                    aspectRatio: { min: 3.0, optimal: 7.0, sigma: 3.0 },
+                i: {
+                    aspectRatio: { optimal: 6.5, sigma: 1.5, min: 4.0 },
+                    openness: { max: 0.04, penaltyThreshold: 0.05 },
                     width: { min: 0.08, range: 0.05 },
-                    mouthCornerAngle: { max: 0.3 }
+                    mouthCornerAngle: { max: 0.25 },
+                    lipThicknessRatio: { optimal: 0.12, sigma: 0.06 }
                 },
-                'う': { 
-                    width: { max: 0.05, optimal: 0.04, sigma: 0.03, penaltyThreshold: 0.07 }, 
-                    circularity: { min: 0.3, penaltyThreshold: 0.3 },
-                    openness: { max: 0.04, sigma: 0.03 },
-                    aspectRatio: { min: 1.0, max: 2.5 },
-                    lipProtrusion: { max: 0.01 }
+                u: {
+                    width: { max: 0.05, penaltyThreshold: 0.06 },
+                    circularity: { min: 0.45, penaltyThreshold: 0.35 },
+                    openness: { max: 0.05, sigma: 0.02 },
+                    aspectRatio: { min: 1.0, max: 2.4 },
+                    lipProtrusion: { max: 0.012 }
                 },
-                'え': { 
-                    aspectRatio: { min: 2.0, optimal: 3.5, sigma: 1.5, penaltyThreshold: 2.0 },
-                    openness: { min: 0.025, optimal: 0.045, sigma: 0.02, max: 0.07 },
-                    width: { min: 0.08, range: 0.04 },
-                    mouthCornerAngle: { max: 0.25 }
+                e: {
+                    aspectRatio: { optimal: 3.0, sigma: 1.0, penaltyThreshold: 2.0 },
+                    openness: { min: 0.03, optimal: 0.045, sigma: 0.015, max: 0.06 },
+                    width: { min: 0.08, range: 0.05 },
+                    mouthCornerAngle: { max: 0.28 },
+                    lipThicknessGap: { optimal: 0.008, sigma: 0.008 }
                 },
-                'お': { 
-                    circularity: { min: 0.3, penaltyThreshold: 0.3 },
-                    aspectRatio: { min: 0.8, max: 1.8, optimal: 1.3, penaltyThreshold: 2.5, falloffRange: 2.0 },
-                    openness: { optimal: 0.055, sigma: 0.02 },
-                    width: { optimal: 0.065, sigma: 0.025 },
-                    lipProtrusion: { max: 0.008 }
+                o: {
+                    circularity: { min: 0.45, penaltyThreshold: 0.38 },
+                    width: { optimal: 0.07, sigma: 0.02 },
+                    lipProtrusion: { max: 0.015 },
+                    thicknessRatio: { optimal: 4.0, sigma: 1.5 },
+                    openness: { optimal: 0.055, sigma: 0.02 }
                 }
             }
         };
 
         if (options.thresholds) {
-            this.thresholds = { ...this.thresholds, ...options.thresholds };
+            this.setThresholds(options.thresholds);
         }
     }
 
     /**
      * 計測値から母音を判別
-     * @param {Object} metrics - 計測値
-     * @param {Object} temporalFeatures - 時間的特徴量（将来の拡張用、現在は未使用）
+     * @param {Object} metrics - 計測値（正規化済み距離を想定）
+     * @param {Object} temporalFeatures - 時系列特徴量
      * @returns {Object} 判別結果
      */
     classify(metrics, temporalFeatures = null) {
-        if (!metrics || !metrics.openness || !metrics.width || !metrics.aspectRatio) {
+        if (!this._hasRequiredMetrics(metrics)) {
             return this._createEmptyResult();
         }
 
         if (this._isMouthClosed(metrics)) {
-            return this._createResult('closed', 1.0, { closed: 1.0 }, metrics);
+            return this._createResult('closed', 1.0, { closed: 1.0, a: 0, i: 0, u: 0, e: 0, o: 0 }, metrics);
         }
 
         const scores = this._calculateScores(metrics);
         const maxScore = Math.max(...Object.values(scores));
-        
+
         if (maxScore < 0.3) {
             return this._createEmptyResult();
         }
 
         const vowel = Object.keys(scores).find(key => scores[key] === maxScore);
         const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
-        const confidence = totalScore > 0 ? maxScore / totalScore : 0;
         const probabilities = this._calculateProbabilities(scores, totalScore);
+        const smoothed = this._smoothVowel(vowel, probabilities[vowel] || 0, temporalFeatures);
 
-        return this._createResult(vowel, confidence, probabilities, metrics, scores);
+        return this._createResult(smoothed.vowel, smoothed.confidence, probabilities, metrics, scores);
     }
 
-    /**
-     * 各母音のスコアを計算（画像の特徴に基づく）
-     * @private
-     */
+    _hasRequiredMetrics(metrics) {
+        return metrics && typeof metrics.openness === 'number' && typeof metrics.width === 'number' && typeof metrics.aspectRatio === 'number';
+    }
+
     _calculateScores(metrics) {
         return {
-            'あ': this._scoreForA(metrics),
-            'い': this._scoreForI(metrics),
-            'う': this._scoreForU(metrics),
-            'え': this._scoreForE(metrics),
-            'お': this._scoreForO(metrics)
+            a: this._scoreForA(metrics),
+            i: this._scoreForI(metrics),
+            u: this._scoreForU(metrics),
+            e: this._scoreForE(metrics),
+            o: this._scoreForO(metrics)
         };
     }
 
-    /**
-     * 「あ」のスコア: openness が最大、aspectRatio が小～中
-     * @private
-     */
     _scoreForA(metrics) {
-        const { openness, aspectRatio, area } = metrics;
-        const config = this.thresholds.vowels['あ'];
+        const { openness = 0, aspectRatio = 0, area = 0 } = metrics;
+        const config = this.thresholds.vowels.a;
 
-        const opennessScore = this._gaussianScore(openness, config.openness.optimal, config.openness.sigma);
-        const aspectScore = aspectRatio < config.aspectRatio.max ? 1.0 : Math.max(0, 1.0 - (aspectRatio - config.aspectRatio.falloffStart) / config.aspectRatio.falloffRange);
-        const areaScore = area ? Math.min(area / config.area.max, 1.0) : 0.5;
+        const openScore = this._gaussianScore(openness, this._getOptimal('a', 'openness', config.openness.optimal), this._getSigma('a', 'openness', config.openness.sigma));
+        const aspectScore = this._clampedRatio(aspectRatio, config.aspectRatio.min, config.aspectRatio.max, config.aspectRatio.falloffRange);
+        const areaScore = Math.min(area / (config.area.max || 0.02), 1.0);
 
-        const finalScore = (opennessScore * 0.7) + (aspectScore * 0.2) + (areaScore * 0.1);
-
-        if (openness < config.openness.penaltyThreshold) return finalScore * 0.3;
-        return finalScore;
+        const combined = (openScore * 0.65) + (aspectScore * 0.25) + (areaScore * 0.1);
+        if (openness < config.openness.penaltyThreshold) return combined * 0.3;
+        return combined;
     }
 
-    /**
-     * 「い」のスコア: aspectRatio が最大、openness が最小
-     * @private
-     */
     _scoreForI(metrics) {
-        const { openness, width, aspectRatio, mouthCornerAngle } = metrics;
-        const config = this.thresholds.vowels['い'];
+        const { openness = 0, width = 0, aspectRatio = 0, mouthCornerAngle, upperLipThickness = 0, lowerLipThickness = 0 } = metrics;
+        const config = this.thresholds.vowels.i;
 
-        const aspectScore = this._gaussianScore(aspectRatio, config.aspectRatio.optimal, config.aspectRatio.sigma);
+        const aspectScore = this._gaussianScore(aspectRatio, this._getOptimal('i', 'aspectRatio', config.aspectRatio.optimal), this._getSigma('i', 'aspectRatio', config.aspectRatio.sigma));
         const opennessScore = openness < config.openness.max ? 1.0 : Math.max(0, 1.0 - (openness - config.openness.max) / config.openness.max);
         const widthScore = width > config.width.min ? Math.min((width - config.width.min) / config.width.range, 1.0) : 0;
-        const cornerScore = mouthCornerAngle ? Math.min(Math.abs(mouthCornerAngle.average || 0) / config.mouthCornerAngle.max, 1.0) : 0.5;
+        const angle = Math.abs(mouthCornerAngle?.average || 0);
+        const cornerScore = 1 - Math.min(angle / config.mouthCornerAngle.max, 1);
+        const lipRatio = width > 0 ? (upperLipThickness + lowerLipThickness) / width : 0;
+        const lipScore = this._gaussianScore(lipRatio, this._getOptimal('i', 'lipThicknessRatio', config.lipThicknessRatio.optimal), this._getSigma('i', 'lipThicknessRatio', config.lipThicknessRatio.sigma));
 
-        const finalScore = (aspectScore * 0.5) + (opennessScore * 0.3) + (widthScore * 0.15) + (cornerScore * 0.05);
-
-        if (aspectRatio < config.aspectRatio.min) return finalScore * 0.3;
-        if (openness > config.openness.penaltyThreshold) return finalScore * 0.5;
-        return finalScore;
+        const combined = (aspectScore * 0.45) + (opennessScore * 0.25) + (widthScore * 0.15) + (cornerScore * 0.1) + (lipScore * 0.05);
+        if (aspectRatio < config.aspectRatio.min) return combined * 0.3;
+        if (openness > config.openness.penaltyThreshold) return combined * 0.5;
+        return combined;
     }
 
-    /**
-     * 「う」のスコア: width が最小、circularity が高い
-     * @private
-     */
     _scoreForU(metrics) {
-        const { openness, width, aspectRatio, circularity, lipProtrusion } = metrics;
-        const config = this.thresholds.vowels['う'];
+        const { openness = 0, width = 0, aspectRatio = 0, circularity = 0, lipProtrusion = 0 } = metrics;
+        const config = this.thresholds.vowels.u;
 
-        const widthScore = width < config.width.max ? 1.0 : Math.max(0, 1.0 - (width - config.width.max) / config.width.sigma);
-        const circularityScore = circularity || 0;
+        const widthScore = width < config.width.max ? 1.0 : Math.max(0, 1.0 - (width - config.width.max) / config.width.max);
+        const circularityScore = circularity;
         const opennessScore = openness < config.openness.max ? 1.0 : Math.max(0, 1.0 - (openness - config.openness.max) / config.openness.sigma);
-        const aspectScore = (aspectRatio >= config.aspectRatio.min && aspectRatio <= config.aspectRatio.max) ? 1.0 : 0.5;
-        const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.5;
+        const aspectScore = (aspectRatio >= config.aspectRatio.min && aspectRatio <= config.aspectRatio.max) ? 1.0 : 0.6;
+        const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.4;
 
-        const finalScore = (widthScore * 0.4) + (circularityScore * 0.25) + (opennessScore * 0.2) + 
-                          (aspectScore * 0.1) + (protrusionScore * 0.05);
-
-        if (width > config.width.penaltyThreshold) return finalScore * 0.2;
-        if (circularity < config.circularity.penaltyThreshold) return finalScore * 0.5;
-        return finalScore;
+        const combined = (widthScore * 0.3) + (circularityScore * 0.3) + (opennessScore * 0.2) + (aspectScore * 0.1) + (protrusionScore * 0.1);
+        if (width > config.width.penaltyThreshold) return combined * 0.25;
+        if (circularity < config.circularity.penaltyThreshold) return combined * 0.5;
+        return combined;
     }
 
-    /**
-     * 「え」のスコア: aspectRatio が大、openness が中
-     * @private
-     */
     _scoreForE(metrics) {
-        const { openness, width, aspectRatio, mouthCornerAngle } = metrics;
-        const config = this.thresholds.vowels['え'];
+        const { openness = 0, width = 0, aspectRatio = 0, mouthCornerAngle, upperLipThickness = 0, lowerLipThickness = 0 } = metrics;
+        const config = this.thresholds.vowels.e;
 
-        const aspectScore = this._gaussianScore(aspectRatio, config.aspectRatio.optimal, config.aspectRatio.sigma);
-        const opennessScore = this._gaussianScore(openness, config.openness.optimal, config.openness.sigma);
-        const widthScore = width > config.width.min ? Math.min((width - config.width.min) / config.width.range, 1.0) : 0.5;
-        const cornerScore = mouthCornerAngle ? Math.min(Math.abs(mouthCornerAngle.average || 0) / config.mouthCornerAngle.max, 1.0) : 0.5;
+        const aspectScore = this._gaussianScore(aspectRatio, this._getOptimal('e', 'aspectRatio', config.aspectRatio.optimal), this._getSigma('e', 'aspectRatio', config.aspectRatio.sigma));
+        const opennessScore = this._gaussianScore(openness, this._getOptimal('e', 'openness', config.openness.optimal), this._getSigma('e', 'openness', config.openness.sigma));
+        const widthScore = width > config.width.min ? Math.min((width - config.width.min) / config.width.range, 1.0) : 0.4;
+        const angle = Math.abs(mouthCornerAngle?.average || 0);
+        const cornerScore = 1 - Math.min(angle / config.mouthCornerAngle.max, 1);
+        const gap = Math.abs(upperLipThickness - lowerLipThickness);
+        const lipGapScore = this._gaussianScore(gap, this._getOptimal('e', 'lipThicknessGap', config.lipThicknessGap.optimal), this._getSigma('e', 'lipThicknessGap', config.lipThicknessGap.sigma));
 
-        const finalScore = (aspectScore * 0.45) + (opennessScore * 0.35) + (widthScore * 0.15) + (cornerScore * 0.05);
-
-        if (aspectRatio < config.aspectRatio.penaltyThreshold) return finalScore * 0.4;
-        if (openness < config.openness.min || openness > config.openness.max) return finalScore * 0.5;
-        return finalScore;
+        const combined = (aspectScore * 0.35) + (opennessScore * 0.3) + (widthScore * 0.15) + (cornerScore * 0.1) + (lipGapScore * 0.1);
+        if (aspectRatio < config.aspectRatio.penaltyThreshold) return combined * 0.5;
+        if (openness < config.openness.min) return combined * 0.2; // 閉口に近い場合は強く減衰
+        if (openness > config.openness.max) return combined * 0.5;
+        return combined;
     }
 
-    /**
-     * 「お」のスコア: circularity が高い、aspectRatio が小
-     * @private
-     */
     _scoreForO(metrics) {
-        const { openness, width, aspectRatio, circularity, lipProtrusion } = metrics;
-        const config = this.thresholds.vowels['お'];
+        const { openness = 0, width = 0, circularity = 0, lipProtrusion = 0, upperLipThickness = 0, lowerLipThickness = 0 } = metrics;
+        const config = this.thresholds.vowels.o;
 
-        const circularityScore = circularity || 0;
-        const aspectScore = (aspectRatio >= config.aspectRatio.min && aspectRatio <= config.aspectRatio.max) ? 1.0 : Math.max(0, 1.0 - Math.abs(aspectRatio - config.aspectRatio.optimal) / config.aspectRatio.falloffRange);
-        const opennessScore = this._gaussianScore(openness, config.openness.optimal, config.openness.sigma);
-        const widthScore = this._gaussianScore(width, config.width.optimal, config.width.sigma);
-        const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.5;
+        const circularityScore = circularity;
+        const thicknessSum = upperLipThickness + lowerLipThickness;
+        const thicknessRatio = thicknessSum > 0 ? width / thicknessSum : 0;
+        const thicknessScore = this._gaussianScore(thicknessRatio, this._getOptimal('o', 'thicknessRatio', config.thicknessRatio.optimal), this._getSigma('o', 'thicknessRatio', config.thicknessRatio.sigma));
+        const opennessScore = this._gaussianScore(openness, this._getOptimal('o', 'openness', config.openness.optimal), this._getSigma('o', 'openness', config.openness.sigma));
+        const widthScore = this._gaussianScore(width, this._getOptimal('o', 'width', config.width.optimal), this._getSigma('o', 'width', config.width.sigma));
+        const protrusionScore = lipProtrusion ? Math.min(lipProtrusion / config.lipProtrusion.max, 1.0) : 0.4;
 
-        const finalScore = (circularityScore * 0.35) + (aspectScore * 0.3) + (opennessScore * 0.2) + 
-                          (widthScore * 0.1) + (protrusionScore * 0.05);
-
-        if (circularity < config.circularity.penaltyThreshold) return finalScore * 0.4;
-        if (aspectRatio > config.aspectRatio.penaltyThreshold) return finalScore * 0.3;
-        return finalScore;
+        const combined = (circularityScore * 0.35) + (thicknessScore * 0.25) + (opennessScore * 0.15) + (widthScore * 0.15) + (protrusionScore * 0.1);
+        if (circularity < config.circularity.penaltyThreshold) return combined * 0.4;
+        return combined;
     }
 
-    /**
-     * ガウス分布ベースのスコア計算
-     * @private
-     * @param {number} value - 実際の値
-     * @param {number} optimal - 最適値（ピーク）
-     * @param {number} sigma - 標準偏差
-     * @returns {number} スコア（0-1）
-     */
     _gaussianScore(value, optimal, sigma) {
         const diff = value - optimal;
-        return Math.exp(-(diff * diff) / (2 * sigma * sigma));
+        const variance = sigma * sigma || 1e-6;
+        return Math.exp(-(diff * diff) / (2 * variance));
     }
 
-    /**
-     * 口が閉じているか判定
-     * @private
-     */
+    _clampedRatio(value, min, max, falloffRange = 1.0) {
+        if (value >= min && value <= max) return 1.0;
+        const distance = value < min ? min - value : value - max;
+        return Math.max(0, 1.0 - distance / falloffRange);
+    }
+
     _isMouthClosed(metrics) {
-        const { openness, aspectRatio } = metrics;
+        const { openness, aspectRatio, upperLipThickness = 0, lowerLipThickness = 0, width = 0 } = metrics;
+
+        // 絶対閾値で早期判定（閉口寄り）
+        if (openness <= 0.02) {
+            return true;
+        }
+
+        // 厚みと幅の比率が高い（隙間がほぼ無い）場合は閉口扱い
+        const thicknessSum = upperLipThickness + lowerLipThickness;
+        const thicknessRatio = width > 0 ? thicknessSum / width : 0;
+        if (openness <= 0.03 && thicknessRatio > 0.25) {
+            return true;
+        }
 
         if (this.baseline) {
             const baselineOpenness = this.baseline.openness || 0.01;
@@ -233,7 +227,6 @@ export class VowelClassifier {
         }
 
         const closedOpennessThreshold = this.thresholds.closed?.openness ?? 0.015;
-        
         if (openness <= closedOpennessThreshold) {
             return true;
         }
@@ -245,10 +238,6 @@ export class VowelClassifier {
         return false;
     }
 
-    /**
-     * 確率分布を計算
-     * @private
-     */
     _calculateProbabilities(scores, totalScore) {
         if (totalScore === 0) {
             return this._getEmptyProbabilities();
@@ -261,38 +250,80 @@ export class VowelClassifier {
         return probabilities;
     }
 
-    /**
-     * 空の確率分布を取得
-     * @private
-     */
     _getEmptyProbabilities() {
         return {
-            'あ': 0,
-            'い': 0,
-            'う': 0,
-            'え': 0,
-            'お': 0,
-            'closed': 0
+            a: 0,
+            i: 0,
+            u: 0,
+            e: 0,
+            o: 0,
+            closed: 0
         };
     }
 
-    /**
-     * 結果オブジェクトを作成
-     * @private
-     */
+    _smoothVowel(vowel, confidence, temporalFeatures) {
+        if (!vowel) {
+            this.vowelHistory = [];
+            return { vowel: null, confidence: 0 };
+        }
+
+        this.vowelHistory.push({ vowel, confidence });
+        if (this.vowelHistory.length > this.historyLength) {
+            this.vowelHistory.shift();
+        }
+
+        const counts = {};
+        this.vowelHistory.forEach(item => {
+            counts[item.vowel] = (counts[item.vowel] || 0) + 1;
+        });
+
+        let majority = vowel;
+        let majorityCount = 0;
+        Object.entries(counts).forEach(([key, count]) => {
+            if (count > majorityCount) {
+                majority = key;
+                majorityCount = count;
+            }
+        });
+
+        const avgConfidence = this.vowelHistory
+            .filter(item => item.vowel === majority)
+            .reduce((sum, item) => sum + item.confidence, 0) / majorityCount;
+
+        const penalty = this._transitionPenalty(temporalFeatures);
+        return { vowel: majority, confidence: avgConfidence * penalty };
+    }
+
+    _transitionPenalty(temporalFeatures) {
+        if (!temporalFeatures) return 1.0;
+        const opennessVelocity = Math.abs(temporalFeatures.openness?.velocity || 0);
+        const widthVelocity = Math.abs(temporalFeatures.width?.velocity || 0);
+        const opennessAcc = Math.abs(temporalFeatures.openness?.acceleration || 0);
+        const widthAcc = Math.abs(temporalFeatures.width?.acceleration || 0);
+
+        const velocitySum = opennessVelocity + widthVelocity;
+        const accSum = opennessAcc + widthAcc;
+
+        if (velocitySum > 0.35 || accSum > 0.7) return 0.7;
+        if (velocitySum > 0.18 || accSum > 0.35) return 0.85;
+        return 1.0;
+    }
+
     _createResult(vowel, confidence, probabilities, metrics, scores = {}) {
         const result = {
-            vowel: vowel,
-            confidence: confidence,
-            probabilities: probabilities,
-            scores: scores,
+            vowel,
+            confidence,
+            probabilities,
+            scores,
             metrics: metrics ? {
                 openness: metrics.openness,
                 width: metrics.width,
                 aspectRatio: metrics.aspectRatio,
                 area: metrics.area,
-                circularity: metrics.circularity
-            } : null
+                circularity: metrics.circularity,
+                scale: metrics.scale
+            } : null,
+            displayVowel: vowel ? (this.labelMap[vowel] || vowel) : this.labelMap.null
         };
 
         if (this.onVowelDetected) {
@@ -302,10 +333,6 @@ export class VowelClassifier {
         return result;
     }
 
-    /**
-     * 空の結果オブジェクトを作成
-     * @private
-     */
     _createEmptyResult() {
         return {
             vowel: null,
@@ -316,19 +343,24 @@ export class VowelClassifier {
         };
     }
 
-    /**
-     * 基準値を設定
-     * @param {Object} baseline - 基準値
-     */
     setBaseline(baseline) {
         this.baseline = baseline;
     }
 
-    /**
-     * 閾値を設定
-     * @param {Object} thresholds - 閾値設定
-     */
     setThresholds(thresholds) {
+        if (thresholds.calibrationProfiles) {
+            this.calibrationProfiles = { ...this.calibrationProfiles, ...thresholds.calibrationProfiles };
+        }
         this.thresholds = { ...this.thresholds, ...thresholds };
+    }
+
+    _getOptimal(vowel, feature, fallback) {
+        const override = this.calibrationProfiles?.[vowel]?.[feature]?.mean;
+        return typeof override === 'number' ? override : fallback;
+    }
+
+    _getSigma(vowel, feature, fallback) {
+        const override = this.calibrationProfiles?.[vowel]?.[feature]?.sigma;
+        return typeof override === 'number' ? override : fallback;
     }
 }

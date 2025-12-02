@@ -51,8 +51,8 @@ export const MOUTH_CONTOUR_INDICES_34 = [
 export const FACE_MESH_CONFIG = {
     maxNumFaces: 1,
     refineLandmarks: true,
-    minDetectionConfidence: 0.3,
-    minTrackingConfidence: 0.3
+    minDetectionConfidence: 0.55,
+    minTrackingConfidence: 0.55
 };
 
 // カメラ設定
@@ -78,4 +78,3 @@ export const EXPORT_CONFIG = {
     csvDelimiter: ',',
     dateFormat: 'YYYY-MM-DD_HH-mm-ss'
 };
-

@@ -151,8 +151,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             vowelClassifier = new VowelClassifier({
                 onVowelDetected: (result) => {
                     // 母音判別結果を表示
+                    const label = result.displayVowel || result.vowel;
                     if (vowelValue) {
-                        vowelValue.textContent = result.vowel || '-';
+                        vowelValue.textContent = label || '-';
                         vowelValue.className = result.vowel ? 'vowel-value detected' : 'vowel-value';
                     }
                     if (vowelConfidenceValue) {
@@ -331,4 +332,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 });
-

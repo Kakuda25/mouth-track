@@ -623,8 +623,8 @@ export class DataProcessor {
      * @param {Array} allMouthLandmarksExtended - 拡張口ランドマーク配列
      * @returns {Object} 計測値（拡張特徴量を含む）
      */
-    static calculateMetricsFromContour34(mouthLandmarks, contourLandmarks, allMouthLandmarksExtended = null) {
-        const baseMetrics = this.calculateAllMetrics(mouthLandmarks, contourLandmarks);
+    static calculateMetricsFromContour34(mouthLandmarks, contourLandmarks, allMouthLandmarksExtended = null, allFaceLandmarks = null) {
+        const baseMetrics = this.calculateAllMetrics(mouthLandmarks, contourLandmarks, allMouthLandmarksExtended, allFaceLandmarks, false);
 
         if (contourLandmarks && contourLandmarks.length >= 34) {
             baseMetrics.cornerMovement = this.calculateCornerMovement(contourLandmarks);
@@ -652,7 +652,8 @@ export class DataProcessor {
             baseMetrics.lipProtrusion = 0;
         }
 
-        return baseMetrics;
+        const scale = this.calculateFaceScale(allFaceLandmarks);
+        return this._applyScaleNormalization(baseMetrics, scale);
     }
 
     /**
@@ -662,7 +663,7 @@ export class DataProcessor {
      * @param {Array} allMouthLandmarksExtended - 拡張口ランドマーク配列（オプション、lipProtrusion計算用）
      * @returns {Object} 計測値
      */
-    static calculateAllMetrics(mouthLandmarks, contourLandmarks = null, allMouthLandmarksExtended = null) {
+    static calculateAllMetrics(mouthLandmarks, contourLandmarks = null, allMouthLandmarksExtended = null, allFaceLandmarks = null, applyNormalization = true) {
         let metrics;
 
         if (contourLandmarks && contourLandmarks.length > 0) {
@@ -696,7 +697,68 @@ export class DataProcessor {
             metrics.lipProtrusion = 0;
         }
 
-        return metrics;
+        const scale = this.calculateFaceScale(allFaceLandmarks);
+        return applyNormalization ? this._applyScaleNormalization(metrics, scale) : { ...metrics, scale };
+    }
+
+    /**
+     * 顔スケールを計算（距離正規化用）
+     * @param {Array|null} allFaceLandmarks - 顔ランドマーク一覧
+     * @returns {number} スケール距離
+     */
+    static calculateFaceScale(allFaceLandmarks) {
+        if (!allFaceLandmarks || allFaceLandmarks.length === 0) {
+            return 1;
+        }
+        const getPoint = (index) => allFaceLandmarks.find(lm => lm.index === index)?.point || allFaceLandmarks.find(lm => lm.index === index);
+        const leftEyeOuter = getPoint(33);
+        const rightEyeOuter = getPoint(263);
+        const noseBridge = getPoint(1);
+        const chin = getPoint(152);
+
+        const eyeDistance = (leftEyeOuter && rightEyeOuter) ? this.distance(leftEyeOuter, rightEyeOuter) : 0;
+        const faceHeight = (noseBridge && chin) ? this.distance(noseBridge, chin) : 0;
+
+        const primary = eyeDistance || faceHeight || 1;
+        return primary || 1;
+    }
+
+    /**
+     * スケール正規化を適用
+     * @param {Object} metrics - 未正規化の計測値
+     * @param {number} scale - スケール距離
+     * @returns {Object} 正規化済み計測値
+     */
+    static _applyScaleNormalization(metrics, scale) {
+        const safeScale = scale && scale > 0 ? scale : 1;
+        const scaleSq = safeScale * safeScale;
+
+        const normalizeDistance = (value) => typeof value === 'number' ? value / safeScale : value;
+        const normalizeArea = (value) => typeof value === 'number' ? value / scaleSq : value;
+
+        const normalized = { ...metrics };
+        normalized.scale = safeScale;
+        normalized.openness = normalizeDistance(metrics.openness);
+        normalized.width = normalizeDistance(metrics.width);
+        normalized.area = normalizeArea(metrics.area);
+
+        normalized.upperLipThickness = normalizeDistance(metrics.upperLipThickness);
+        normalized.lowerLipThickness = normalizeDistance(metrics.lowerLipThickness);
+        normalized.cornerMovement = metrics.cornerMovement ? {
+            left: normalizeDistance(metrics.cornerMovement.left),
+            right: normalizeDistance(metrics.cornerMovement.right),
+            average: normalizeDistance(metrics.cornerMovement.average)
+        } : metrics.cornerMovement;
+        normalized.cheekMovement = metrics.cheekMovement ? {
+            left: normalizeDistance(metrics.cheekMovement.left),
+            right: normalizeDistance(metrics.cheekMovement.right),
+            average: normalizeDistance(metrics.cheekMovement.average)
+        } : metrics.cheekMovement;
+        normalized.jawMovement = normalizeDistance(metrics.jawMovement);
+        normalized.upperLipHeight = normalizeDistance(metrics.upperLipHeight);
+        normalized.lowerLipHeight = normalizeDistance(metrics.lowerLipHeight);
+        normalized.lipProtrusion = normalizeDistance(metrics.lipProtrusion);
+
+        return normalized;
     }
 }
-
