@@ -214,8 +214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (data.landmarks) {
                             // 顔が検出されている
                             overlayInfo.style.display = 'none';
-                            // 顔全体のランドマークが利用可能な場合はそれを使用（既存の描画ロジックを使用しない）
-                            // 次にMOUTH_ALL_LANDMARKS、次に34点版、最後に既存の描画
+                            // 顔全体のランドマークが利用可能な場合はそれを使用（DEFAULT_LANDMARKSから抽出）
                             visualizer.drawLandmarks(data.landmarks, data.contourLandmarks34, data.allMouthLandmarksExtended, data.allFaceLandmarks);
                         } else {
                             // 顔が検出されていない
@@ -235,8 +234,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                             }
                         }
                     }
-                }, {
-                    use34Points: true
                 });
 
                 await mouthTracker.initialize();

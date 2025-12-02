@@ -2,20 +2,49 @@
  * MouthLandmarks - 口ランドマーク定義とユーティリティ
  */
 
-import { MOUTH_LANDMARKS } from '../config/constants.js';
+import { DEFAULT_LANDMARKS } from '../config/constants.js';
+
+// DEFAULT_LANDMARKSから基本8点のインデックスを定義
+const BASIC_MOUTH_INDICES = {
+    leftEnd: 61,
+    rightEnd: 291,
+    topOuter: 13,
+    bottomOuter: 14,
+    topLeft: 37,
+    topRight: 267,
+    bottomLeft: 84,
+    bottomRight: 314
+};
+
+/**
+ * DEFAULT_LANDMARKSが読み込めない場合のチェック
+ */
+function validateDefaultLandmarks() {
+    if (!DEFAULT_LANDMARKS || !Array.isArray(DEFAULT_LANDMARKS) || DEFAULT_LANDMARKS.length === 0) {
+        return false;
+    }
+    return true;
+}
 
 /**
  * 口ランドマークのインデックス配列を取得
  */
 export function getMouthLandmarkIndices() {
-    return Object.values(MOUTH_LANDMARKS);
+    if (!validateDefaultLandmarks()) {
+        return [];
+    }
+    return Object.values(BASIC_MOUTH_INDICES).filter(idx => DEFAULT_LANDMARKS.includes(idx));
 }
 
 /**
  * ランドマーク名からインデックスを取得
  */
 export function getLandmarkIndex(name) {
-    return MOUTH_LANDMARKS[name] || null;
+    if (!validateDefaultLandmarks()) {
+        return null;
+    }
+    const index = BASIC_MOUTH_INDICES[name];
+    return index && DEFAULT_LANDMARKS.includes(index) ? index : null;
 }
 
 /**
@@ -26,15 +55,19 @@ export function structureMouthLandmarks(landmarks) {
         return null;
     }
 
-    return {
-        leftEnd: landmarks[MOUTH_LANDMARKS.leftEnd],
-        rightEnd: landmarks[MOUTH_LANDMARKS.rightEnd],
-        topOuter: landmarks[MOUTH_LANDMARKS.topOuter],
-        bottomOuter: landmarks[MOUTH_LANDMARKS.bottomOuter],
-        topLeft: landmarks[MOUTH_LANDMARKS.topLeft],
-        topRight: landmarks[MOUTH_LANDMARKS.topRight],
-        bottomLeft: landmarks[MOUTH_LANDMARKS.bottomLeft],
-        bottomRight: landmarks[MOUTH_LANDMARKS.bottomRight]
-    };
+    if (!validateDefaultLandmarks()) {
+        return null;
+    }
+
+    const result = {};
+    for (const [key, index] of Object.entries(BASIC_MOUTH_INDICES)) {
+        if (DEFAULT_LANDMARKS.includes(index) && landmarks[index]) {
+            result[key] = landmarks[index];
+        } else {
+            return null;
+        }
+    }
+
+    return result;
 }
 

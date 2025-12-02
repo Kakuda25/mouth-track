@@ -125,7 +125,7 @@ export class DataProcessor {
     }
 
     /**
-     * 口の輪郭ランドマークから計測値を計算（MOUTH_CONTOUR_INDICESを使用）
+     * 口の輪郭ランドマークから計測値を計算（DEFAULT_LANDMARKSから抽出）
      * より多くの点を使用することで、より正確な計測が可能
      * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列
      * @param {Object} basicLandmarks - 基本ランドマーク（左端、右端等）
@@ -617,16 +617,17 @@ export class DataProcessor {
     }
 
     /**
-     * 34点版の計測値を計算
+     * DEFAULT_LANDMARKSから計測値を計算
      * @param {Object} mouthLandmarks - 口ランドマーク
-     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列（34点）
-     * @param {Array} allMouthLandmarksExtended - 拡張口ランドマーク配列
+     * @param {Array} contourLandmarks - 口の輪郭ランドマーク配列（DEFAULT_LANDMARKSから抽出）
+     * @param {Array} allMouthLandmarksExtended - 拡張口ランドマーク配列（DEFAULT_LANDMARKSから抽出）
+     * @param {Array} allFaceLandmarks - 顔ランドマーク配列（DEFAULT_LANDMARKSから抽出）
      * @returns {Object} 計測値（拡張特徴量を含む）
      */
-    static calculateMetricsFromContour34(mouthLandmarks, contourLandmarks, allMouthLandmarksExtended = null, allFaceLandmarks = null) {
+    static calculateMetricsFromDefaultLandmarks(mouthLandmarks, contourLandmarks = null, allMouthLandmarksExtended = null, allFaceLandmarks = null) {
         const baseMetrics = this.calculateAllMetrics(mouthLandmarks, contourLandmarks, allMouthLandmarksExtended, allFaceLandmarks, false);
 
-        if (contourLandmarks && contourLandmarks.length >= 34) {
+        if (contourLandmarks && contourLandmarks.length > 0) {
             baseMetrics.cornerMovement = this.calculateCornerMovement(contourLandmarks);
             baseMetrics.cheekMovement = this.calculateCheekMovement(contourLandmarks);
             baseMetrics.jawMovement = this.calculateJawMovement(contourLandmarks);

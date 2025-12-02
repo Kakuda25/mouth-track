@@ -21,7 +21,6 @@ export class MouthTracker {
         this.temporalExtractor = options.temporalExtractor || new TemporalFeatureExtractor({
             bufferSize: options.temporalBufferSize || 30
         });
-        this.use34Points = options.use34Points !== false;
         this.isTracking = false;
         this.animationFrameId = null;
         this.lastMetrics = null;
@@ -62,12 +61,24 @@ export class MouthTracker {
      * @param {Object} results - FaceMeshの結果
      */
     processResults(results) {
-        const mouthLandmarks = this.faceMeshHandler.getMouthLandmarks(results);
-        const allMouthLandmarksExtended = this.faceMeshHandler.getAllMouthLandmarksExtended(results);
-        const allFaceLandmarks = this.faceMeshHandler.getAllFaceLandmarks(results);
-        const contourLandmarks = this.faceMeshHandler.getMouthContourLandmarks(results, this.use34Points);
-        const confidence = this.faceMeshHandler.getConfidence(results);
+        const defaultLandmarks = this.faceMeshHandler.getDefaultLandmarks(results);
+        if (!defaultLandmarks) {
+            const now = Date.now();
+            if (!this.lastNoFaceWarning || now - this.lastNoFaceWarning > 2000) {
+                this.lastNoFaceWarning = now;
+                this.onDataUpdate({
+                    landmarks: null,
+                    metrics: null,
+                    contourLandmarks34: null,
+                    confidence: 0,
+                    fps: this.fpsCounter.currentFps,
+                    faceDetected: false
+                });
+            }
+            return;
+        }
 
+        const mouthLandmarks = this.faceMeshHandler.getMouthLandmarks(results);
         if (!mouthLandmarks) {
             const now = Date.now();
             if (!this.lastNoFaceWarning || now - this.lastNoFaceWarning > 2000) {
@@ -86,6 +97,11 @@ export class MouthTracker {
 
         this.lastNoFaceWarning = null;
 
+        const contourLandmarks = this.faceMeshHandler.getMouthContourLandmarks(results);
+        const allMouthLandmarksExtended = this.faceMeshHandler.getAllMouthLandmarksExtended(results);
+        const allFaceLandmarks = this.faceMeshHandler.getAllFaceLandmarks(results);
+        const confidence = this.faceMeshHandler.getConfidence(results);
+
         const smoothedLandmarks = this._smoothMouthLandmarksObject(mouthLandmarks);
         const smoothedAllMouthLandmarksExtended = this._smoothLandmarks(allMouthLandmarksExtended, 'all_extended_');
         const smoothedAllFaceLandmarks = this._smoothLandmarks(allFaceLandmarks, 'face_');
@@ -100,7 +116,7 @@ export class MouthTracker {
                 allFaceLandmarks: smoothedAllFaceLandmarks,
                 metrics: null,
                 temporalFeatures: null,
-                contourLandmarks34: this.use34Points && contourLandmarks && contourLandmarks.length >= 34 ? contourLandmarks : null,
+                contourLandmarks34: contourLandmarks,
                 confidence: 0,
                 fps: this.fpsCounter.currentFps,
                 timestamp: Date.now(),
@@ -110,17 +126,12 @@ export class MouthTracker {
             return;
         }
 
-        let metrics;
-        if (this.use34Points && contourLandmarks && contourLandmarks.length >= 34) {
-            metrics = DataProcessor.calculateMetricsFromContour34(
-                smoothedLandmarks, 
-                contourLandmarks,
-                smoothedAllMouthLandmarksExtended,
-                smoothedAllFaceLandmarks
-            );
-        } else {
-            metrics = DataProcessor.calculateAllMetrics(smoothedLandmarks, contourLandmarks, smoothedAllMouthLandmarksExtended, smoothedAllFaceLandmarks);
-        }
+        const metrics = DataProcessor.calculateMetricsFromDefaultLandmarks(
+            smoothedLandmarks,
+            contourLandmarks,
+            smoothedAllMouthLandmarksExtended,
+            smoothedAllFaceLandmarks
+        );
 
         if (this.lastMetrics) {
             metrics.opennessRate = DataProcessor.calculateChangeRate(
@@ -147,7 +158,7 @@ export class MouthTracker {
             allFaceLandmarks: smoothedAllFaceLandmarks,
             metrics: metrics,
             temporalFeatures: temporalFeatures,
-            contourLandmarks34: this.use34Points && contourLandmarks && contourLandmarks.length >= 34 ? contourLandmarks : null,
+            contourLandmarks34: contourLandmarks,
             confidence: confidence,
             fps: this.fpsCounter.currentFps,
             timestamp: Date.now(),
@@ -348,9 +359,20 @@ export class MouthTracker {
             return { passed: true, reason: 'insufficient_landmarks_bypassed' };
         }
 
-        const zValues = landmarks
-            .map(lm => (lm.point || lm)?.z)
-            .filter(z => typeof z === 'number');
+        const zValues = [];
+        const visibilities = [];
+
+        landmarks.forEach(lm => {
+            const point = lm.point || lm;
+            if (point) {
+                if (typeof point.z === 'number') {
+                    zValues.push(point.z);
+                }
+                if (typeof point.visibility === 'number') {
+                    visibilities.push(point.visibility);
+                }
+            }
+        });
 
         if (zValues.length < 5) {
             return { passed: true, reason: 'insufficient_z_bypassed' };
@@ -360,6 +382,11 @@ export class MouthTracker {
         const variance = zValues.reduce((sum, z) => sum + Math.pow(z - mean, 2), 0) / zValues.length;
         const stdDev = Math.sqrt(variance);
 
-        return { passed: stdDev <= 0.04, stdDev };
+        const avgVisibility = visibilities.length > 0
+            ? visibilities.reduce((sum, v) => sum + v, 0) / visibilities.length
+            : 1;
+
+        const passed = stdDev <= 0.04 && avgVisibility >= 0.5;
+        return { passed, stdDev, avgVisibility };
     }
 }
