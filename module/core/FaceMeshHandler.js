@@ -24,8 +24,6 @@ export class FaceMeshHandler {
     async initialize(videoElement) {
         return new Promise((resolve, reject) => {
             try {
-                // MediaPipe FaceMeshがグローバルに読み込まれているか確認
-                // CDNから読み込まれた場合はwindow.FaceMeshに存在
                 const FaceMeshClass = window.FaceMesh;
 
                 if (!FaceMeshClass) {
@@ -33,10 +31,8 @@ export class FaceMeshHandler {
                     return;
                 }
 
-                // FaceMesh初期化
                 this.faceMesh = new FaceMeshClass({
                     locateFile: (file) => {
-                        // npmパッケージから読み込む
                         return `/node_modules/@mediapipe/face_mesh/${file}`;
                     }
                 });
@@ -56,7 +52,6 @@ export class FaceMeshHandler {
                     }
                 });
 
-                // FaceMeshの初期化を実行
                 this.faceMesh.initialize().then(() => {
 
                     resolve();

@@ -20,7 +20,6 @@ export class CameraManager {
      * @returns {Promise<Array>} カメラデバイスの配列
      */
     async getAvailableCameras(maxRetries = 3, retryDelay = 1000) {
-        // mediaDevices APIが利用可能か確認
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             throw new Error('このブラウザはカメラアクセスをサポートしていません。HTTPSまたはlocalhostでアクセスしてください。');
         }
@@ -101,7 +100,6 @@ export class CameraManager {
                     }
                 };
 
-                // デバイスIDが指定されている場合は使用
                 if (deviceId) {
                     constraints.video.deviceId = { exact: deviceId };
                 }

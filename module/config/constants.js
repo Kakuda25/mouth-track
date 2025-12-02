@@ -47,7 +47,6 @@ export const MOUTH_CONTOUR_INDICES_34 = [
     2, 200
 ];
 
-// MediaPipe FaceMesh設定
 export const FACE_MESH_CONFIG = {
     maxNumFaces: 1,
     refineLandmarks: true,
@@ -55,14 +54,12 @@ export const FACE_MESH_CONFIG = {
     minTrackingConfidence: 0.55
 };
 
-// カメラ設定
 export const CAMERA_CONFIG = {
     width: 1280,
     height: 720,
     facingMode: 'user'
 };
 
-// デフォルト設定値
 export const DEFAULT_SETTINGS = {
     smoothingFactor: 0.5,
     showLandmarks: true,
@@ -70,10 +67,8 @@ export const DEFAULT_SETTINGS = {
     mirrorMode: true
 };
 
-// FPS計算用
-export const FPS_INTERVAL = 1000; // 1秒
+export const FPS_INTERVAL = 1000;
 
-// データエクスポート設定
 export const EXPORT_CONFIG = {
     csvDelimiter: ',',
     dateFormat: 'YYYY-MM-DD_HH-mm-ss'
@@ -85,8 +80,8 @@ export const EXPORT_CONFIG = {
 export const DEFAULT_LANDMARKS = [
     // 顔スケール計算用（4点）
     1,      // 鼻根（鼻橋）
-    2,      // その他
-    11,     // その他
+    2,
+    11,
     12,     // 上唇外側
     13,     // 上唇中央（外側）
     14,     // 下唇中央（外側）
@@ -112,7 +107,7 @@ export const DEFAULT_LANDMARKS = [
     172,    // 顎下部
     175,    // 顎上部
     176,    // 顎上部
-    200,    // その他
+    200,
     263,    // 右目の外側
     267,    // 上唇外側右
     269,    // 口角右周辺

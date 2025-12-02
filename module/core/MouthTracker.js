@@ -15,9 +15,7 @@ export class MouthTracker {
         this.videoElement = videoElement;
         this.onDataUpdate = onDataUpdate || (() => { });
         this.faceMeshHandler = new FaceMeshHandler();
-        // 依存性注入: Smootherをカスタマイズ可能にする
         this.smoother = options.smoother || new Smoother(options.smoothingFactor || 0.65);
-        // 時間的特徴量抽出器を初期化
         this.temporalExtractor = options.temporalExtractor || new TemporalFeatureExtractor({
             bufferSize: options.temporalBufferSize || 30
         });
@@ -48,8 +46,6 @@ export class MouthTracker {
             this.faceMeshHandler.setOnResults((results) => {
                 this.processResults(results);
             });
-
-
         } catch (error) {
             ErrorHandler.handleError(error, 'MouthTracker初期化');
             throw error;
@@ -229,7 +225,6 @@ export class MouthTracker {
      */
     start() {
         if (this.isTracking) {
-
             return;
         }
 
@@ -287,8 +282,6 @@ export class MouthTracker {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
-
-
     }
 
     /**

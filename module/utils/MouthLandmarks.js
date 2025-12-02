@@ -4,7 +4,6 @@
 
 import { DEFAULT_LANDMARKS } from '../config/constants.js';
 
-// DEFAULT_LANDMARKSから基本8点のインデックスを定義
 const BASIC_MOUTH_INDICES = {
     leftEnd: 61,
     rightEnd: 291,

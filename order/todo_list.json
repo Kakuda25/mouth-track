@@ -16,7 +16,6 @@
       "owner": "agent",
       "priority": "high",
       "tags": ["setup"],
-      "estimate": "1h",
       "logs": [
         {
           "timestamp": "2025-12-03T00:00:00Z",
@@ -25,6 +24,36 @@
         }
       ],
       "artifacts": ["初期化.md"],
+      "related": []
+    },
+    {
+      "id": 2,
+      "title": "母音検知の数値調整とドキュメント作成",
+      "description": "母音判定に問題があるため、母音検知で使用されている項目と判断ロジックを詳細に記録し、数値調整のためのドキュメントを作成する",
+      "status": "in-progress",
+      "created_at": "2025-01-27T00:00:00Z",
+      "updated_at": "2025-01-27T00:00:00Z",
+      "owner": "agent",
+      "priority": "high",
+      "tags": ["vowel-detection", "documentation", "tuning"],
+      "logs": [
+        {
+          "timestamp": "2025-01-27T00:00:00Z",
+          "author": "agent",
+          "message": "VowelClassifierの実装を確認し、母音検知で使用されている項目と判断ロジックを分析開始"
+        },
+        {
+          "timestamp": "2025-01-27T00:00:00Z",
+          "author": "agent",
+          "message": "母音検知の詳細ドキュメント作成中：各母音の判定項目、閾値、スコア計算方法を記録"
+        },
+        {
+          "timestamp": "2025-01-27T00:00:00Z",
+          "author": "agent",
+          "message": "docs/VOWEL_DETECTION_DETAILED.mdを作成完了。各母音（あ、い、う、え、お）の判定項目、閾値、重み付け、スコア計算方法、閉口判定、時系列平滑化、数値調整の指針を詳細に記録"
+        }
+      ],
+      "artifacts": ["docs/VOWEL_DETECTION_DETAILED.md"],
       "related": []
     }
   ]
